@@ -92,16 +92,18 @@ const GalleryEditor = () => {
     return (
         <div style={{
             minHeight: '100vh',
+            height: '100vh',
             backgroundColor: currentTheme.bg,
             color: currentTheme.text,
             fontFamily: '"Inter", sans-serif',
             userSelect: 'none',
-            position: 'relative'
+            position: 'relative',
+            overflow: 'hidden'
         }}>
             {/* Floating Exit Button */}
             <button
                 onClick={() => navigate('/dashboard')}
-                className="fixed top-6 left-6 z-50 flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-xs tracking-wide transition-all duration-300 opacity-70 hover:opacity-100"
+                className="fixed top-4 left-4 md:top-6 md:left-6 z-50 flex items-center gap-2 px-3 py-2 md:px-4 md:py-2 rounded-lg font-bold text-xs tracking-wide transition-all duration-300 opacity-70 hover:opacity-100"
                 style={{
                     backgroundColor: currentTheme.bgAlt,
                     color: currentTheme.text,
@@ -129,27 +131,6 @@ const GalleryEditor = () => {
                     controlsText: currentTheme.text
                 }}
             />
-
-            {/* Mobile message */}
-            <div style={{
-                display: 'none',
-                position: 'fixed',
-                top: 0,
-                left: 0,
-                width: '100%',
-                height: '100%',
-                backgroundColor: currentTheme.bg,
-                color: currentTheme.text,
-                zIndex: 1000,
-                flexDirection: 'column',
-                justifyContent: 'center',
-                alignItems: 'center',
-                textAlign: 'center',
-                padding: '2rem'
-            }}
-                 className="mobile-message">
-                <p>This experience is optimized for desktop.</p>
-            </div>
         </div>
     );
 };

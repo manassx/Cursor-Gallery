@@ -1,6 +1,6 @@
 import {useState} from 'react';
 import {useNavigate} from 'react-router-dom';
-import {ArrowLeft, ArrowRight, Sparkles, Wand2} from 'lucide-react';
+import {ArrowLeft, ArrowRight} from 'lucide-react';
 import {motion} from 'framer-motion';
 import toast from 'react-hot-toast';
 import FileUploadZone from '../components/upload/FileUploadZone';
@@ -114,7 +114,7 @@ const CreateGallery = () => {
 
     return (
         <div
-            className="h-screen relative overflow-hidden transition-colors duration-500"
+            className="min-h-screen relative overflow-hidden transition-colors duration-500"
             style={{backgroundColor: currentTheme.bg}}
         >
             {/* Animated noise scanline overlay */}
@@ -147,7 +147,7 @@ const CreateGallery = () => {
             {/* Floating Back Button */}
             <button
                 onClick={() => step > 1 && step < 3 ? setStep(step - 1) : navigate('/dashboard')}
-                className="fixed top-6 left-6 z-50 flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-xs tracking-wide transition-all duration-300 opacity-70 hover:opacity-100"
+                className="fixed top-4 left-4 md:top-6 md:left-6 z-50 flex items-center gap-2 px-3 py-2 md:px-4 md:py-2 rounded-lg font-bold text-xs tracking-wide transition-all duration-300 opacity-70 hover:opacity-100"
                 style={{
                     backgroundColor: currentTheme.bgAlt,
                     color: currentTheme.text,
@@ -166,12 +166,12 @@ const CreateGallery = () => {
                 <span>BACK</span>
             </button>
 
-            <div className="h-full flex items-center justify-center px-4 relative z-10">
+            <div className="h-screen grid place-items-center px-4 py-16 md:py-0 overflow-hidden relative z-10">
 
                 {/* Step 1: Gallery Details */}
                 {step === 1 && (
                     <motion.div
-                        className="w-full max-w-3xl p-12 border transition-all duration-500"
+                        className="w-full max-w-2xl p-4 md:p-8 lg:p-10 border transition-all duration-500 my-auto"
                         style={{
                             backgroundColor: currentTheme.bgAlt,
                             borderColor: currentTheme.border,
@@ -180,37 +180,26 @@ const CreateGallery = () => {
                         animate={{opacity: 1, y: 0}}
                         transition={{duration: 0.6}}
                     >
-                        <div className="text-center mb-10">
-                            <div
-                                className="w-20 h-20 mx-auto mb-6 rounded-full flex items-center justify-center transition-colors duration-300"
-                                style={{
-                                    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)'
-                                }}
-                            >
-                                <Sparkles
-                                    className="w-10 h-10"
-                                    style={{color: currentTheme.accent}}
-                                />
-                            </div>
+                        <div className="text-center mb-4 md:mb-6 lg:mb-8">
                             <h1
-                                className="text-5xl font-black tracking-tight mb-4 transition-colors duration-500"
+                                className="text-xl md:text-3xl lg:text-4xl xl:text-5xl font-black tracking-tight mb-2 md:mb-3 transition-colors duration-500"
                                 style={{fontFamily: 'Arial Black, sans-serif', color: currentTheme.text}}
                             >
                                 Name Your Gallery
                             </h1>
                             <p
-                                className="text-lg transition-colors duration-500"
+                                className="text-xs md:text-sm lg:text-base transition-colors duration-500"
                                 style={{fontFamily: 'Georgia, serif', color: currentTheme.textMuted}}
                             >
                                 Give it a title. Add context if you want.
                             </p>
                         </div>
 
-                        <form onSubmit={handleDetailsSubmit} className="space-y-6">
+                        <form onSubmit={handleDetailsSubmit} className="space-y-3 md:space-y-5 lg:space-y-6">
                             <div>
                                 <label
                                     htmlFor="name"
-                                    className="block text-sm font-bold mb-3 tracking-wide transition-colors duration-500"
+                                    className="block text-xs md:text-sm font-bold mb-1.5 md:mb-2 tracking-wide transition-colors duration-500"
                                     style={{color: currentTheme.text}}
                                 >
                                     TITLE
@@ -220,7 +209,7 @@ const CreateGallery = () => {
                                     id="name"
                                     value={galleryData.name}
                                     onChange={(e) => setGalleryData({...galleryData, name: e.target.value})}
-                                    className="w-full px-5 py-4 border-2 transition-all duration-300 outline-none text-lg"
+                                    className="w-full px-3 py-2.5 md:px-5 md:py-4 border-2 transition-all duration-300 outline-none text-sm md:text-base lg:text-lg"
                                     style={{
                                         backgroundColor: currentTheme.input || currentTheme.bg,
                                         borderColor: currentTheme.border,
@@ -236,17 +225,17 @@ const CreateGallery = () => {
                             <div>
                                 <label
                                     htmlFor="description"
-                                    className="block text-sm font-bold mb-3 tracking-wide transition-colors duration-500"
+                                    className="block text-xs md:text-sm font-bold mb-1.5 md:mb-2 tracking-wide transition-colors duration-500"
                                     style={{color: currentTheme.text}}
                                 >
                                     DESCRIPTION (OPTIONAL)
                                 </label>
                                 <textarea
                                     id="description"
-                                    rows={3}
+                                    rows={2}
                                     value={galleryData.description}
                                     onChange={(e) => setGalleryData({...galleryData, description: e.target.value})}
-                                    className="w-full px-5 py-4 border-2 resize-none transition-all duration-300 outline-none"
+                                    className="w-full px-3 py-2.5 md:px-5 md:py-4 border-2 resize-none transition-all duration-300 outline-none text-xs md:text-sm lg:text-base"
                                     style={{
                                         backgroundColor: currentTheme.input || currentTheme.bg,
                                         borderColor: currentTheme.border,
@@ -260,7 +249,7 @@ const CreateGallery = () => {
 
                             <motion.button
                                 type="submit"
-                                className="w-full flex items-center justify-center gap-3 px-8 py-5 font-bold text-sm tracking-wide transition-all duration-300"
+                                className="w-full flex items-center justify-center gap-2 md:gap-3 px-6 md:px-8 py-2.5 md:py-4 lg:py-5 font-bold text-xs md:text-sm tracking-wide transition-all duration-300"
                                 style={{
                                     backgroundColor: currentTheme.accent,
                                     color: isDark ? '#0a0a0a' : '#f5f3ef'
@@ -269,7 +258,7 @@ const CreateGallery = () => {
                                 whileTap={{scale: 0.98}}
                             >
                                 <span>CONTINUE</span>
-                                <ArrowRight size={20}/>
+                                <ArrowRight size={window.innerWidth < 768 ? 16 : 20}/>
                             </motion.button>
                         </form>
                     </motion.div>
@@ -278,21 +267,21 @@ const CreateGallery = () => {
                 {/* Step 2: Upload Images */}
                 {step === 2 && (
                     <motion.div
-                        className="w-full max-w-5xl"
+                        className="w-full max-w-4xl my-auto max-h-[90vh] overflow-y-auto"
                         initial={{opacity: 0, y: 30}}
                         animate={{opacity: 1, y: 0}}
                         transition={{duration: 0.6}}
                     >
-                        <div className="text-center mb-8">
+                        <div className="text-center mb-4 md:mb-6">
                             <h1
-                                className="text-6xl font-black tracking-tight mb-4 transition-colors duration-500"
+                                className="text-2xl md:text-4xl lg:text-5xl xl:text-6xl font-black tracking-tight mb-2 md:mb-3 transition-colors duration-500"
                                 style={{fontFamily: 'Arial Black, sans-serif', color: currentTheme.text}}
                             >
                                 {galleryData.name}
                             </h1>
                             {galleryData.description && (
                                 <p
-                                    className="text-lg transition-colors duration-500"
+                                    className="text-xs md:text-sm lg:text-base xl:text-lg transition-colors duration-500"
                                     style={{fontFamily: 'Georgia, serif', color: currentTheme.textMuted}}
                                 >
                                     {galleryData.description}
@@ -301,7 +290,7 @@ const CreateGallery = () => {
                         </div>
 
                         <div
-                            className="p-8 border transition-all duration-500 max-h-[60vh] overflow-y-auto"
+                            className="p-3 md:p-6 lg:p-8 border transition-all duration-500"
                             style={{
                                 backgroundColor: currentTheme.bgAlt,
                                 borderColor: currentTheme.border,
@@ -310,12 +299,12 @@ const CreateGallery = () => {
                             <FileUploadZone onFilesSelected={handleFilesSelected}/>
 
                             {uploadedFiles.length > 0 && (
-                                <div className="mt-8 pt-6 border-t transition-colors duration-500"
+                                <div className="mt-4 md:mt-6 pt-3 md:pt-4 border-t transition-colors duration-500"
                                      style={{borderColor: currentTheme.border}}>
                                     <motion.button
                                         onClick={handleCreateGallery}
                                         disabled={isLoading || uploadedFiles.length < 10}
-                                        className="w-full flex items-center justify-center gap-3 px-8 py-5 font-bold text-sm tracking-wide transition-all duration-300"
+                                        className="w-full flex items-center justify-center gap-2 md:gap-3 px-6 md:px-8 py-2.5 md:py-4 lg:py-5 font-bold text-xs md:text-sm tracking-wide transition-all duration-300"
                                         style={{
                                             backgroundColor: uploadedFiles.length >= 10 ? currentTheme.accent : currentTheme.border,
                                             color: uploadedFiles.length >= 10 ? (isDark ? '#0a0a0a' : '#f5f3ef') : currentTheme.textDim,
@@ -324,12 +313,11 @@ const CreateGallery = () => {
                                         whileHover={uploadedFiles.length >= 10 ? {scale: 1.02} : {}}
                                         whileTap={uploadedFiles.length >= 10 ? {scale: 0.98} : {}}
                                     >
-                                        <Wand2 size={20}/>
                                         <span>CREATE GALLERY</span>
                                     </motion.button>
                                     {uploadedFiles.length < 10 && (
                                         <p
-                                            className="text-sm text-center mt-3 transition-colors duration-500"
+                                            className="text-xs md:text-sm text-center mt-2 transition-colors duration-500"
                                             style={{color: currentTheme.textDim}}
                                         >
                                             Need at least 10 images
@@ -344,7 +332,7 @@ const CreateGallery = () => {
                 {/* Step 3: Processing */}
                 {step === 3 && (
                     <motion.div
-                        className="w-full max-w-3xl p-12 border transition-all duration-500"
+                        className="w-full max-w-2xl p-4 md:p-8 lg:p-10 border transition-all duration-500 my-auto"
                         style={{
                             backgroundColor: currentTheme.bgAlt,
                             borderColor: currentTheme.border,
@@ -353,28 +341,15 @@ const CreateGallery = () => {
                         animate={{opacity: 1, y: 0}}
                         transition={{duration: 0.6}}
                     >
-                        <div className="text-center mb-10">
-                            <motion.div
-                                className="w-24 h-24 mx-auto mb-6 rounded-full flex items-center justify-center transition-colors duration-300"
-                                style={{
-                                    backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)'
-                                }}
-                                animate={{scale: [1, 1.1, 1]}}
-                                transition={{repeat: Infinity, duration: 2}}
-                            >
-                                <Wand2
-                                    className="w-12 h-12"
-                                    style={{color: currentTheme.accent}}
-                                />
-                            </motion.div>
+                        <div className="text-center mb-4 md:mb-6 lg:mb-8">
                             <h2
-                                className="text-5xl font-black mb-4 transition-colors duration-500"
+                                className="text-xl md:text-3xl lg:text-4xl xl:text-5xl font-black mb-2 md:mb-3 transition-colors duration-500"
                                 style={{color: currentTheme.text}}
                             >
                                 Working On It
                             </h2>
                             <p
-                                className="text-base transition-colors duration-500"
+                                className="text-xs md:text-sm lg:text-base transition-colors duration-500"
                                 style={{fontFamily: 'Georgia, serif', color: currentTheme.textMuted}}
                             >
                                 Processing your images and setting things up
@@ -388,14 +363,14 @@ const CreateGallery = () => {
                         />
 
                         <div
-                            className="mt-8 p-4 transition-all duration-500"
+                            className="mt-4 md:mt-6 lg:mt-8 p-3 md:p-4 transition-all duration-500"
                             style={{
                                 backgroundColor: isDark ? 'rgba(232, 232, 232, 0.05)' : 'rgba(42, 37, 32, 0.03)',
                                 borderLeft: `4px solid ${currentTheme.accent}`
                             }}
                         >
                             <p
-                                className="text-sm text-center transition-colors duration-500"
+                                className="text-xs md:text-sm text-center transition-colors duration-500"
                                 style={{color: currentTheme.text}}
                             >
                                 Takes about 2 minutes. Keep this window open.

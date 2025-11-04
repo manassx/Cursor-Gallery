@@ -15,6 +15,7 @@ function CursorTrailGallery({
     const [threshold, setThreshold] = useState(initialThreshold);
     const [lightboxOpen, setLightboxOpen] = useState(false);
     const [lightboxIndex, setLightboxIndex] = useState(0);
+    const [isMobile, setIsMobile] = useState(false);
 
     const lastPosition = useRef({x: 0, y: 0});
     const containerRef = useRef(null);
@@ -26,6 +27,16 @@ function CursorTrailGallery({
     };
 
     const currentTheme = theme || defaultTheme;
+
+    // Detect mobile device
+    useEffect(() => {
+        const checkMobile = () => {
+            setIsMobile(window.innerWidth <= 768 || 'ontouchstart' in window);
+        };
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
 
     function DecThreshold() {
         setThreshold((prev) => {
@@ -40,12 +51,19 @@ function CursorTrailGallery({
                 next = prev - 20;
             }
             if (next < 20) next = 20;
+
+            // Constrain to 80 max on mobile/tablet
+            if (isMobile && next > 80) next = 80;
+
             return next;
         });
     }
 
     function IncThreshold() {
         setThreshold((prev) => {
+            // Limit to 80 on mobile/tablet
+            if (isMobile && prev >= 80) return 80;
+
             let next = prev;
             if (prev < 40) {
                 next = prev + 20;
@@ -57,6 +75,10 @@ function CursorTrailGallery({
                 next = prev + 60;
             }
             if (next > 200) next = 200;
+
+            // Constrain to 80 max on mobile/tablet
+            if (isMobile && next > 80) next = 80;
+
             return next;
         });
     }
@@ -70,10 +92,7 @@ function CursorTrailGallery({
         }
     }
 
-    function handlePosition(e) {
-        const rect = containerRef.current.getBoundingClientRect();
-        const currentX = e.clientX - rect.left;
-        const currentY = e.clientY - rect.top;
+    function placeImageAt(currentX, currentY) {
         const distanceX = Math.abs(currentX - lastPosition.current.x);
         const distanceY = Math.abs(currentY - lastPosition.current.y);
 
@@ -91,11 +110,11 @@ function CursorTrailGallery({
 
                 let maxLength;
                 if (threshold <= 20) {
-                    maxLength = 15;
+                    maxLength = isMobile ? 8 : 15;
                 } else if (threshold <= 40) {
-                    maxLength = 10;
+                    maxLength = isMobile ? 5 : 10;
                 } else {
-                    maxLength = 6;
+                    maxLength = isMobile ? 3 : 6;
                 }
                 const newArray = [...prevState, newImage];
 
@@ -106,6 +125,22 @@ function CursorTrailGallery({
             });
             setNextImage((prevState) => (prevState + 1) % images.length);
         }
+    }
+
+    function handlePosition(e) {
+        const rect = containerRef.current.getBoundingClientRect();
+        const currentX = e.clientX - rect.left;
+        const currentY = e.clientY - rect.top;
+        placeImageAt(currentX, currentY);
+    }
+
+    function handleTouch(e) {
+        // Don't prevent default to allow tap-to-click for lightbox
+        const rect = containerRef.current.getBoundingClientRect();
+        const touch = e.touches[0];
+        const currentX = touch.clientX - rect.left;
+        const currentY = touch.clientY - rect.top;
+        placeImageAt(currentX, currentY);
     }
 
     function closeLightbox() {
@@ -138,26 +173,43 @@ function CursorTrailGallery({
         const container = containerRef.current;
 
         const handleMouseLeave = () => {
-            setPlacedImages([]);
-            lastPosition.current = {x: 0, y: 0};
+            if (clearOnLeave) {
+                setPlacedImages([]);
+                lastPosition.current = {x: 0, y: 0};
+            }
         };
 
+        const handleTouchEnd = () => {
+            if (clearOnLeave) {
+                setPlacedImages([]);
+                lastPosition.current = {x: 0, y: 0};
+            }
+        };
+
+        // Mouse events (desktop)
         container.addEventListener("mousemove", handlePosition);
+
+        // Touch events (mobile)
+        container.addEventListener("touchmove", handleTouch, {passive: true});
+        container.addEventListener("touchend", handleTouchEnd);
+
         if (clearOnLeave) {
             container.addEventListener("mouseleave", handleMouseLeave);
         }
 
         return function () {
             container.removeEventListener("mousemove", handlePosition);
+            container.removeEventListener("touchmove", handleTouch);
+            container.removeEventListener("touchend", handleTouchEnd);
             if (clearOnLeave) {
                 container.removeEventListener("mouseleave", handleMouseLeave);
             }
         };
-    }, [threshold, nextImage, clearOnLeave]);
+    }, [threshold, nextImage, clearOnLeave, isMobile]);
 
     return (
         <div className={styles.container}>
-            <div ref={containerRef} className={styles.galleryContainer}>
+            <div ref={containerRef} className={styles.galleryContainer} style={{overflow: "hidden"}}>
                 {placedImages.map((image, index) => (
                     <img
                         key={image.id}
@@ -183,7 +235,7 @@ function CursorTrailGallery({
                         onClick={closeLightbox}
                         aria-label="Close"
                     >
-                        <X size={32}/>
+                        <X size={isMobile ? 24 : 32}/>
                     </button>
 
                     {/* Previous button */}
@@ -195,7 +247,7 @@ function CursorTrailGallery({
                         }}
                         aria-label="Previous"
                     >
-                        <ChevronLeft size={48}/>
+                        <ChevronLeft size={isMobile ? 32 : 48}/>
                     </button>
 
                     {/* Image */}
@@ -216,7 +268,7 @@ function CursorTrailGallery({
                         }}
                         aria-label="Next"
                     >
-                        <ChevronRight size={48}/>
+                        <ChevronRight size={isMobile ? 32 : 48}/>
                     </button>
                 </div>
             )}
@@ -240,7 +292,9 @@ function CursorTrailGallery({
                         </button>
                     </div>
                     <span className={styles.label}
-                          style={{color: currentTheme.controlsText}}>saxenamanas04@gmail.com</span>
+                          style={{color: currentTheme.controlsText}}>
+                        saxenamanas04@gmail.com
+                    </span>
                 </div>
             )}
         </div>

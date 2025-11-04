@@ -145,7 +145,7 @@ const LoginPage = () => {
 
     return (
         <div
-            className="h-screen grid place-items-center px-4 relative overflow-hidden transition-colors duration-500"
+            className="h-screen flex items-center justify-center px-4 py-8 md:py-0 relative overflow-hidden transition-colors duration-500"
             style={{backgroundColor: currentTheme.bg}}
         >
             {/* Animated noise scanline overlay */}
@@ -180,7 +180,7 @@ const LoginPage = () => {
                 initial={{opacity: 0, x: -20}}
                 animate={{opacity: 1, x: 0}}
                 transition={{duration: 0.6}}
-                className="fixed top-8 left-8 z-10"
+                className="fixed top-4 left-4 md:top-8 md:left-8 z-10"
             >
                 <Link
                     to="/"
@@ -190,27 +190,27 @@ const LoginPage = () => {
                     onMouseLeave={(e) => e.target.style.color = currentTheme.textDim}
                 >
                     <ArrowLeft size={20}/>
-                    <span>BACK TO HOME</span>
+                    <span className="hidden sm:inline">BACK TO HOME</span>
                 </Link>
             </motion.div>
 
             {/* Centered Login Card */}
-            <div className="w-full max-w-md relative z-10">
+            <div className="w-full max-w-[90%] sm:max-w-md relative z-10">
                 {/* Header */}
                 <motion.div
-                    className="text-center mb-8"
+                    className="text-center mb-4 md:mb-6"
                     initial={{opacity: 0, y: -20}}
                     animate={{opacity: 1, y: 0}}
                     transition={{duration: 0.6}}
                 >
                     <h1
-                        className="text-5xl font-black tracking-tight transition-colors duration-500"
+                        className="text-3xl md:text-4xl lg:text-5xl font-black tracking-tight transition-colors duration-500"
                         style={{fontFamily: 'Arial Black, sans-serif', color: currentTheme.text}}
                     >
                         Sign In
                     </h1>
                     <p
-                        className="mt-4 text-sm transition-colors duration-500"
+                        className="mt-2 md:mt-4 text-sm transition-colors duration-500"
                         style={{color: currentTheme.textMuted}}
                     >
                         Don't have an account?{' '}
@@ -234,7 +234,7 @@ const LoginPage = () => {
                     transition={{duration: 0.5, ease: 'easeOut'}}
                     onMouseMove={handleCardMouseMove}
                     onMouseLeave={handleCardMouseLeave}
-                    className="px-8 py-10 shadow-2xl rounded-xl border transition-all duration-100"
+                    className="px-6 py-8 md:px-8 md:py-10 shadow-2xl rounded-xl border transition-all duration-100"
                     style={{
                         backgroundColor: currentTheme.bgAlt,
                         borderColor: currentTheme.border,
@@ -244,7 +244,7 @@ const LoginPage = () => {
                 >
                     <form
                         ref={formRef}
-                        className="space-y-6"
+                        className="space-y-4 md:space-y-6"
                         onSubmit={handleSubmit}
                         onMouseMove={handleFormMouseMove}
                         onMouseLeave={handleFormMouseLeave}
@@ -261,7 +261,7 @@ const LoginPage = () => {
                                 onChange={handleChange}
                                 onFocus={() => setFocusedField('email')}
                                 onBlur={() => setFocusedField(null)}
-                                className="w-full px-4 pt-6 pb-2 rounded-lg border-2 transition-all duration-300 outline-none"
+                                className="w-full px-3 md:px-4 pt-5 md:pt-6 pb-1.5 md:pb-2 rounded-lg border-2 transition-all duration-300 outline-none text-sm md:text-base"
                                 style={{
                                     backgroundColor: currentTheme.input,
                                     borderColor: focusedField === 'email' ? currentTheme.accent : currentTheme.inputBorder,
@@ -270,13 +270,12 @@ const LoginPage = () => {
                             />
                             <label
                                 htmlFor="email"
-                                className="absolute left-4 transition-all duration-300 pointer-events-none"
+                                className="absolute left-3 md:left-4 transition-all duration-300 pointer-events-none text-xs md:text-sm"
                                 style={{
-                                    top: focusedField === 'email' || formData.email ? '8px' : '50%',
-                                    transform: `translateY(${focusedField === 'email' || formData.email ? '0' : '-50%'}) scale(${focusedField === 'email' || formData.email ? '0.8' : '1'})`,
+                                    top: focusedField === 'email' || formData.email ? '6px' : '50%',
+                                    transform: `translateY(${focusedField === 'email' || formData.email ? '0' : '-50%'}) scale(${focusedField === 'email' || formData.email ? '0.85' : '1'})`,
                                     transformOrigin: 'left top',
                                     color: focusedField === 'email' ? currentTheme.accent : currentTheme.textDim,
-                                    fontSize: focusedField === 'email' || formData.email ? '12px' : '16px',
                                 }}
                             >
                                 Email address
@@ -295,7 +294,7 @@ const LoginPage = () => {
                                 onChange={handleChange}
                                 onFocus={() => setFocusedField('password')}
                                 onBlur={() => setFocusedField(null)}
-                                className="w-full px-4 pt-6 pb-2 pr-12 rounded-lg border-2 transition-all duration-300 outline-none"
+                                className="w-full px-3 md:px-4 pt-5 md:pt-6 pb-1.5 md:pb-2 pr-12 rounded-lg border-2 transition-all duration-300 outline-none text-sm md:text-base"
                                 style={{
                                     backgroundColor: currentTheme.input,
                                     borderColor: focusedField === 'password' ? currentTheme.accent : currentTheme.inputBorder,
@@ -304,13 +303,12 @@ const LoginPage = () => {
                             />
                             <label
                                 htmlFor="password"
-                                className="absolute left-4 transition-all duration-300 pointer-events-none"
+                                className="absolute left-3 md:left-4 transition-all duration-300 pointer-events-none text-xs md:text-sm"
                                 style={{
-                                    top: focusedField === 'password' || formData.password ? '8px' : '50%',
-                                    transform: `translateY(${focusedField === 'password' || formData.password ? '0' : '-50%'}) scale(${focusedField === 'password' || formData.password ? '0.8' : '1'})`,
+                                    top: focusedField === 'password' || formData.password ? '6px' : '50%',
+                                    transform: `translateY(${focusedField === 'password' || formData.password ? '0' : '-50%'}) scale(${focusedField === 'password' || formData.password ? '0.85' : '1'})`,
                                     transformOrigin: 'left top',
                                     color: focusedField === 'password' ? currentTheme.accent : currentTheme.textDim,
-                                    fontSize: focusedField === 'password' || formData.password ? '12px' : '16px',
                                 }}
                             >
                                 Password
@@ -354,14 +352,14 @@ const LoginPage = () => {
                                 />
                                 <label
                                     htmlFor="remember-me"
-                                    className="ml-2 block text-sm transition-colors duration-500"
+                                    className="ml-2 block text-xs md:text-sm transition-colors duration-500"
                                     style={{color: currentTheme.textMuted}}
                                 >
                                     Remember me
                                 </label>
                             </div>
 
-                            <div className="text-sm">
+                            <div className="text-xs md:text-sm">
                                 <a
                                     href="#"
                                     className="font-medium transition-colors duration-300"
@@ -380,7 +378,7 @@ const LoginPage = () => {
                                 ref={buttonRef}
                                 type="submit"
                                 disabled={isLoading}
-                                className="w-full px-8 py-4 rounded-lg font-bold text-sm tracking-wide transition-all duration-300"
+                                className="w-full px-6 py-3 md:px-8 md:py-4 rounded-lg font-bold text-sm tracking-wide transition-all duration-300"
                                 style={{
                                     backgroundColor: currentTheme.accent,
                                     color: isDark ? '#0a0a0a' : '#f5f3ef',
@@ -430,7 +428,7 @@ const LoginPage = () => {
                             <motion.button
                                 type="button"
                                 onClick={handleGoogleSignIn}
-                                className="w-full px-8 py-4 rounded-lg font-medium text-sm tracking-wide flex items-center justify-center gap-3 border-2 transition-all duration-300"
+                                className="w-full px-4 py-3 md:px-8 md:py-4 rounded-lg font-medium text-xs md:text-sm tracking-wide flex items-center justify-center gap-2 md:gap-3 border-2 transition-all duration-300 whitespace-nowrap"
                                 style={{
                                     backgroundColor: currentTheme.input,
                                     borderColor: currentTheme.inputBorder,
@@ -442,7 +440,7 @@ const LoginPage = () => {
                                 }}
                                 whileTap={{scale: 0.98}}
                             >
-                                <svg className="w-5 h-5" viewBox="0 0 24 24">
+                                <svg className="w-4 h-4 md:w-5 md:h-5 flex-shrink-0" viewBox="0 0 24 24">
                                     <path
                                         fill="#4285F4"
                                         d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"
@@ -471,7 +469,7 @@ const LoginPage = () => {
                     initial={{opacity: 0}}
                     animate={{opacity: 1}}
                     transition={{duration: 0.8, delay: 0.5}}
-                    className="mt-8 text-center"
+                    className="mt-4 md:mt-8 text-center"
                 >
                     <p className="text-xs transition-colors duration-500" style={{color: currentTheme.textDim}}>
                         CursorGallery &copy; 2025 - Interactive Gallery System

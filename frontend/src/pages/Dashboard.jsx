@@ -50,22 +50,22 @@ const Dashboard = () => {
                 }}
             />
 
-            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 relative z-10">
+            <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 md:py-8 relative z-10">
                 {/* Header */}
                 <motion.div
-                    className="mb-12"
+                    className="mb-8 md:mb-12"
                     initial={{opacity: 0, y: -20}}
                     animate={{opacity: 1, y: 0}}
                     transition={{duration: 0.6}}
                 >
                     <h1
-                        className="text-5xl font-black tracking-tight transition-colors duration-500"
+                        className="text-3xl md:text-4xl lg:text-5xl font-black tracking-tight transition-colors duration-500"
                         style={{fontFamily: 'Arial Black, sans-serif', color: currentTheme.text}}
                     >
                         Welcome back, {user?.name || 'User'}!
                     </h1>
                     <p
-                        className="text-lg mt-4 transition-colors duration-500"
+                        className="text-sm md:text-base lg:text-lg mt-3 md:mt-4 transition-colors duration-500"
                         style={{fontFamily: 'Georgia, serif', color: currentTheme.textMuted}}
                     >
                         Create and manage your interactive photo galleries
@@ -74,7 +74,7 @@ const Dashboard = () => {
 
                 {/* Quick stats */}
                 <motion.div
-                    className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12"
+                    className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4 md:gap-6 mb-8 md:mb-12"
                     initial={{opacity: 0, y: 20}}
                     animate={{opacity: 1, y: 0}}
                     transition={{duration: 0.6, delay: 0.2}}
@@ -86,7 +86,7 @@ const Dashboard = () => {
                     ].map((stat, idx) => (
                         <motion.div
                             key={idx}
-                            className="p-6 border transition-all duration-300"
+                            className="p-4 md:p-6 border transition-all duration-300"
                             style={{
                                 backgroundColor: currentTheme.bgAlt,
                                 borderColor: currentTheme.border,
@@ -99,26 +99,26 @@ const Dashboard = () => {
                             <div className="flex items-center justify-between">
                                 <div>
                                     <p
-                                        className="text-sm mb-2 transition-colors duration-500"
+                                        className="text-xs md:text-sm mb-2 transition-colors duration-500"
                                         style={{color: currentTheme.textMuted}}
                                     >
                                         {stat.label}
                                     </p>
                                     <p
-                                        className="text-4xl font-black transition-colors duration-500"
+                                        className="text-3xl md:text-4xl font-black transition-colors duration-500"
                                         style={{color: currentTheme.text}}
                                     >
                                         {stat.value}
                                     </p>
                                 </div>
                                 <div
-                                    className="p-3 rounded-lg transition-colors duration-300"
+                                    className="p-2 md:p-3 rounded-lg transition-colors duration-300"
                                     style={{
                                         backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)'
                                     }}
                                 >
                                     <stat.icon
-                                        className="w-6 h-6"
+                                        className="w-5 h-5 md:w-6 md:h-6"
                                         style={{color: currentTheme.accent}}
                                     />
                                 </div>
@@ -129,7 +129,7 @@ const Dashboard = () => {
 
                 {/* Empty state */}
                 <motion.div
-                    className="p-16 border text-center transition-all duration-500"
+                    className="p-8 md:p-12 lg:p-16 border text-center transition-all duration-500"
                     style={{
                         backgroundColor: currentTheme.bgAlt,
                         borderColor: currentTheme.border,
@@ -139,24 +139,24 @@ const Dashboard = () => {
                     transition={{duration: 0.6, delay: 0.4}}
                 >
                     <div
-                        className="w-20 h-20 mx-auto mb-6 rounded-full flex items-center justify-center transition-colors duration-300"
+                        className="w-16 h-16 md:w-20 md:h-20 mx-auto mb-4 md:mb-6 rounded-full flex items-center justify-center transition-colors duration-300"
                         style={{
                             backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)'
                         }}
                     >
                         <ImageIcon
-                            className="w-10 h-10"
+                            className="w-8 h-8 md:w-10 md:h-10"
                             style={{color: currentTheme.textDim}}
                         />
                     </div>
                     <h3
-                        className="text-3xl font-black mb-4 transition-colors duration-500"
+                        className="text-2xl md:text-3xl font-black mb-3 md:mb-4 transition-colors duration-500"
                         style={{color: currentTheme.text}}
                     >
                         No galleries yet
                     </h3>
                     <p
-                        className="text-base mb-8 max-w-md mx-auto transition-colors duration-500"
+                        className="text-sm md:text-base mb-6 md:mb-8 max-w-md mx-auto px-4 transition-colors duration-500"
                         style={{fontFamily: 'Georgia, serif', color: currentTheme.textMuted}}
                     >
                         Create your first interactive gallery to get started. Transform your photos into a dynamic,
@@ -164,7 +164,7 @@ const Dashboard = () => {
                     </p>
                     <Link
                         to="/create"
-                        className="inline-flex items-center gap-3 px-8 py-4 font-bold text-sm tracking-wide transition-all duration-300"
+                        className="inline-flex items-center gap-2 md:gap-3 px-6 md:px-8 py-3 md:py-4 font-bold text-xs md:text-sm tracking-wide transition-all duration-300"
                         style={{
                             backgroundColor: currentTheme.accent,
                             color: isDark ? '#0a0a0a' : '#f5f3ef'
@@ -178,7 +178,7 @@ const Dashboard = () => {
                             e.target.style.transform = 'scale(1)';
                         }}
                     >
-                        <Plus size={20}/>
+                        <Plus size={window.innerWidth < 768 ? 16 : 20}/>
                         <span>Create Your First Gallery</span>
                     </Link>
                 </motion.div>

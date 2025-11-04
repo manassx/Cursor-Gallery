@@ -12,6 +12,7 @@
     width: 100%;
     min-height: 100vh;
     overflow: hidden;
+    touch-action: none; /* Prevent default touch behavior and scrolling */
 }
 
 .placedImage {
@@ -34,6 +35,27 @@
     transform: translate(-50%, -50%) scale(1.05);
 }
 
+/* Mobile-specific image sizes */
+@media (max-width: 768px) {
+    .placedImage {
+        min-width: 200px;
+        max-width: 60vw;
+        max-height: 50vh;
+    }
+
+    .placedImage:hover {
+        transform: translate(-50%, -50%) scale(1.02);
+    }
+}
+
+@media (max-width: 480px) {
+    .placedImage {
+        min-width: 150px;
+        max-width: 70vw;
+        max-height: 45vh;
+    }
+}
+
 .controls {
     font-weight: 400;
     position: fixed;
@@ -44,7 +66,25 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 4px;
+    padding: 8px 12px;
+    flex-wrap: nowrap;
+    gap: 12px;
+}
+
+@media (max-width: 768px) {
+    .controls {
+        padding: 6px 8px;
+        gap: 8px;
+        font-size: 0.85rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .controls {
+        padding: 4px 6px;
+        gap: 6px;
+        font-size: 0.75rem;
+    }
 }
 
 .threshold {
@@ -54,13 +94,34 @@
     font-weight: 400;
 }
 
+@media (max-width: 768px) {
+    .threshold {
+        gap: 6px;
+    }
+}
+
+@media (max-width: 480px) {
+    .threshold {
+        gap: 4px;
+    }
+
+    .threshold span:first-child {
+        display: none; /* Hide "Threshold:" text on very small screens */
+    }
+}
+
 .adjustBtn {
     background: transparent;
     border: none;
     font-size: 20px;
     cursor: pointer;
-    margin: 2px 6px;
+    margin: 0;
+    padding: 4px 8px;
     color: inherit;
+    min-width: 28px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .adjustBtn:hover {
@@ -71,20 +132,63 @@
     transform: scale(0.95);
 }
 
+@media (max-width: 768px) {
+    .adjustBtn {
+        font-size: 22px;
+        padding: 6px 10px;
+        min-width: 32px;
+    }
+}
+
+@media (max-width: 480px) {
+    .adjustBtn {
+        font-size: 20px;
+        padding: 4px 8px;
+        min-width: 28px;
+    }
+}
+
 .value {
     min-width: 40px;
     text-align: center;
     font-weight: 400;
 }
 
+@media (max-width: 768px) {
+    .value {
+        font-size: 1rem;
+        min-width: 44px;
+    }
+}
+
+@media (max-width: 480px) {
+    .value {
+        font-size: 0.9rem;
+        min-width: 36px;
+    }
+}
+
 .label {
     font-size: 1rem;
     font-weight: 400;
     text-decoration: none;
+    white-space: nowrap;
 }
 
 .label:hover {
     opacity: 0.7;
+}
+
+@media (max-width: 768px) {
+    .label {
+        font-size: 0.85rem;
+    }
+}
+
+@media (max-width: 480px) {
+    .label {
+        font-size: 0.7rem;
+    }
 }
 
 /* Lightbox Styles */
@@ -141,6 +245,13 @@
     object-fit: contain;
     border-radius: 2px;
     box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+}
+
+@media (max-width: 768px) {
+    .lightboxImage {
+        max-width: 95vw;
+        max-height: 85vh;
+    }
 }
 
 .lightboxClose {
@@ -207,21 +318,44 @@
     .lightboxClose {
         top: 16px;
         right: 16px;
+        width: 40px;
+        height: 40px;
+    }
+
+    .lightboxPrev,
+    .lightboxNext {
+        width: 50px;
+        height: 50px;
+    }
+
+    .lightboxPrev {
+        left: 8px;
+    }
+
+    .lightboxNext {
+        right: 8px;
+    }
+}
+
+@media (max-width: 480px) {
+    .lightboxClose {
+        top: 12px;
+        right: 12px;
         width: 36px;
         height: 36px;
     }
 
     .lightboxPrev,
     .lightboxNext {
-        width: 48px;
-        height: 48px;
+        width: 44px;
+        height: 44px;
     }
 
     .lightboxPrev {
-        left: 16px;
+        left: 4px;
     }
 
     .lightboxNext {
-        right: 16px;
+        right: 4px;
     }
 }
