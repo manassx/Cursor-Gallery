@@ -158,6 +158,14 @@ export const del = (endpoint, options = {}) => {
     });
 };
 
+export const updateImageTransform = async (imageId, transformData) => {
+    return await patch(`/api/images/${imageId}/transform`, transformData);
+};
+
+export const updateGalleryBranding = async (galleryId, brandingData) => {
+    return await patch(`/api/galleries/${galleryId}/branding`, brandingData);
+};
+
 export default {
     get,
     post,
@@ -165,4 +173,6 @@ export default {
     patch,
     delete: del,
     request: apiRequest,
+    updateImageTransform,
+    updateGalleryBranding
 };

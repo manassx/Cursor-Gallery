@@ -1,6 +1,6 @@
 import {Link, useNavigate} from 'react-router-dom';
 import {useState, useEffect, useRef} from 'react';
-import {ArrowRight, MoveRight, Moon, Sun, Menu, X} from 'lucide-react';
+import {ArrowRight, MoveRight, Moon, Sun, Menu, X, Eye} from 'lucide-react';
 import {motion, useScroll, useTransform, useMotionValue, useSpring} from 'framer-motion';
 import CursorTrailGallery from '../components/gallery/CursorTrailGallery';
 import {useTheme} from '../context/ThemeContext';
@@ -9,11 +9,12 @@ import useAuthStore from '../store/authStore';
 const LandingPage = () => {
     const navigate = useNavigate();
     const {isDark, setIsDark, currentTheme} = useTheme();
-    const {isAuthenticated} = useAuthStore();
+    const {isAuthenticated, user} = useAuthStore();
     const [cursorPos, setCursorPos] = useState({x: 0, y: 0});
     const [scrolled, setScrolled] = useState(false);
     const [navbarVisible, setNavbarVisible] = useState(true);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [isMobile, setIsMobile] = useState(false);
     const heroRef = useRef(null);
     const demoSectionRef = useRef(null);
     const canvasRef = useRef(null);
@@ -26,8 +27,20 @@ const LandingPage = () => {
     const smoothCursorX = useSpring(cursorX, {damping: 30, stiffness: 200});
     const smoothCursorY = useSpring(cursorY, {damping: 30, stiffness: 200});
 
-    // Track cursor for custom cursor effect
+    // Detect mobile
     useEffect(() => {
+        const checkMobile = () => {
+            setIsMobile(window.innerWidth <= 768);
+        };
+        checkMobile();
+        window.addEventListener('resize', checkMobile);
+        return () => window.removeEventListener('resize', checkMobile);
+    }, []);
+
+    // Track cursor for custom cursor effect (desktop only)
+    useEffect(() => {
+        if (isMobile) return;
+
         const handleMouseMove = (e) => {
             setCursorPos({x: e.clientX, y: e.clientY});
             cursorX.set(e.clientX);
@@ -35,7 +48,7 @@ const LandingPage = () => {
         };
         window.addEventListener('mousemove', handleMouseMove);
         return () => window.removeEventListener('mousemove', handleMouseMove);
-    }, []);
+    }, [isMobile]);
 
     // Track scroll for navbar
     useEffect(() => {
@@ -92,7 +105,7 @@ const LandingPage = () => {
 
     return (
         <div className="min-h-screen relative overflow-hidden transition-colors duration-500"
-             style={{backgroundColor: currentTheme.bg, cursor: window.innerWidth > 768 ? 'none' : 'auto'}}>
+             style={{backgroundColor: currentTheme.bg, cursor: !isMobile ? 'none' : 'auto'}}>
             {/* Animated noise scanline overlay */}
             <div
                 className="fixed inset-0 pointer-events-none z-50 mix-blend-overlay transition-opacity duration-500"
@@ -121,7 +134,7 @@ const LandingPage = () => {
             />
 
             {/* Custom cursor - Only on desktop */}
-            {window.innerWidth > 768 && (
+            {!isMobile && (
                 <motion.div
                     className="fixed w-1 h-1 rounded-full pointer-events-none z-50 mix-blend-difference transition-colors duration-300"
                     style={{
@@ -136,14 +149,14 @@ const LandingPage = () => {
 
             {/* Glassmorphism Navigation Bar - Always visible, changes on scroll */}
             <motion.nav
-                className="fixed top-0 left-0 right-0 z-50 px-4 md:px-6 lg:px-12 py-3 md:py-4"
+                className="fixed top-0 left-0 right-0 z-50 px-3 sm:px-4 md:px-6 lg:px-12 py-2 sm:py-3 md:py-4"
                 style={{cursor: 'auto'}}
             >
                 <motion.div
                     initial={{opacity: 0, y: -20}}
                     animate={{opacity: 1, y: navbarVisible ? 0 : -100}}
                     transition={{duration: 0.4, ease: "easeInOut"}}
-                    className="max-w-[1400px] mx-auto flex items-center justify-between px-4 md:px-6 py-3 border transition-all duration-300"
+                    className="max-w-[1400px] mx-auto flex items-center justify-between px-3 sm:px-4 md:px-6 py-2 sm:py-3 border transition-all duration-300"
                     style={{
                         background: scrolled ? currentTheme.navBg : currentTheme.navBgTransparent,
                         borderColor: scrolled ? currentTheme.borderAlt : currentTheme.border,
@@ -153,10 +166,10 @@ const LandingPage = () => {
                 >
                     {/* Logo */}
                     <Link to="/" className="flex items-center gap-2 md:gap-3">
-                        <div className="w-1.5 h-1.5 rounded-full transition-colors duration-300"
+                        <div className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full transition-colors duration-300"
                              style={{backgroundColor: currentTheme.text}}></div>
                         <span
-                            className="font-light text-xs md:text-sm tracking-[0.2em] md:tracking-[0.3em] transition-colors duration-300"
+                            className="font-light text-[9px] sm:text-xs md:text-sm tracking-[0.15em] sm:tracking-[0.2em] md:tracking-[0.3em] transition-colors duration-300"
                               style={{color: currentTheme.text}}>
                             CURSOR GALLERY
                         </span>
@@ -165,13 +178,13 @@ const LandingPage = () => {
                     {/* Desktop Nav Links */}
                     <div className="hidden md:flex items-center gap-4 lg:gap-8">
                         <Link
-                            to={isAuthenticated ? "/dashboard" : "/login"}
+                            to={isAuthenticated ? "/settings" : "/login"}
                             className="text-xs tracking-[0.2em] transition-colors duration-300"
                             style={{color: currentTheme.textDim}}
                             onMouseEnter={(e) => e.target.style.color = currentTheme.text}
                             onMouseLeave={(e) => e.target.style.color = currentTheme.textDim}
                         >
-                            {isAuthenticated ? "DASHBOARD" : "LOGIN"}
+                            {isAuthenticated ? "SETTINGS" : "LOGIN"}
                         </Link>
 
                         {/* Theme Toggle */}
@@ -188,7 +201,7 @@ const LandingPage = () => {
                         </button>
 
                         <Link
-                            to="/create"
+                            to={isAuthenticated ? "/dashboard" : "/create"}
                             className="px-4 lg:px-6 py-2 text-xs tracking-[0.2em] font-medium transition-all duration-300"
                             style={{
                                 backgroundColor: currentTheme.accent,
@@ -197,30 +210,32 @@ const LandingPage = () => {
                             onMouseEnter={(e) => e.target.style.backgroundColor = currentTheme.accentHover}
                             onMouseLeave={(e) => e.target.style.backgroundColor = currentTheme.accent}
                         >
-                            START
+                            {isAuthenticated ? "DASHBOARD" : "START"}
                         </Link>
                     </div>
 
                     {/* Mobile Menu Button */}
-                    <div className="flex md:hidden items-center gap-3">
+                    <div className="flex md:hidden items-center gap-2 sm:gap-3">
                         <button
                             onClick={() => setIsDark(!isDark)}
-                            className="p-2 rounded-full transition-all duration-300"
+                            className="p-1.5 sm:p-2 rounded-full transition-all duration-300"
                             style={{
                                 backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.1)',
                                 color: currentTheme.text
                             }}
                             aria-label="Toggle theme"
                         >
-                            {isDark ? <Sun className="w-4 h-4"/> : <Moon className="w-4 h-4"/>}
+                            {isDark ? <Sun className="w-3.5 h-3.5 sm:w-4 sm:h-4"/> :
+                                <Moon className="w-3.5 h-3.5 sm:w-4 sm:h-4"/>}
                         </button>
                         <button
                             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-                            className="p-2"
+                            className="p-1.5 sm:p-2"
                             style={{color: currentTheme.text}}
                             aria-label="Toggle menu"
                         >
-                            {mobileMenuOpen ? <X className="w-5 h-5"/> : <Menu className="w-5 h-5"/>}
+                            {mobileMenuOpen ? <X className="w-4 h-4 sm:w-5 sm:h-5"/> :
+                                <Menu className="w-4 h-4 sm:w-5 sm:h-5"/>}
                         </button>
                     </div>
                 </motion.div>
@@ -231,32 +246,32 @@ const LandingPage = () => {
                         initial={{opacity: 0, y: -20}}
                         animate={{opacity: 1, y: 0}}
                         exit={{opacity: 0, y: -20}}
-                        className="md:hidden mt-2 mx-4 border transition-all duration-300"
+                        className="md:hidden mt-2 mx-3 sm:mx-4 border transition-all duration-300"
                         style={{
                             background: currentTheme.navBg,
                             borderColor: currentTheme.borderAlt,
                             backdropFilter: 'blur(10px)',
                         }}
                     >
-                        <div className="flex flex-col p-4 gap-4">
+                        <div className="flex flex-col p-3 sm:p-4 gap-3 sm:gap-4">
                             <Link
-                                to={isAuthenticated ? "/dashboard" : "/login"}
+                                to={isAuthenticated ? "/settings" : "/login"}
                                 className="text-xs tracking-[0.2em] py-2 transition-colors duration-300"
                                 style={{color: currentTheme.textDim}}
                                 onClick={() => setMobileMenuOpen(false)}
                             >
-                                {isAuthenticated ? "DASHBOARD" : "LOGIN"}
+                                {isAuthenticated ? "SETTINGS" : "LOGIN"}
                             </Link>
                             <Link
-                                to="/create"
-                                className="px-4 py-3 text-xs tracking-[0.2em] font-medium transition-all duration-300 text-center"
+                                to={isAuthenticated ? "/dashboard" : "/create"}
+                                className="px-4 py-2.5 sm:py-3 text-xs tracking-[0.2em] font-medium transition-all duration-300 text-center"
                                 style={{
                                     backgroundColor: currentTheme.accent,
                                     color: isDark ? '#0a0a0a' : '#f5f3ef'
                                 }}
                                 onClick={() => setMobileMenuOpen(false)}
                             >
-                                START
+                                {isAuthenticated ? "DASHBOARD" : "START"}
                             </Link>
                         </div>
                     </motion.div>
@@ -265,15 +280,15 @@ const LandingPage = () => {
 
             {/* Hero Section */}
             <section
-                className="relative min-h-screen px-4 md:px-6 lg:px-12 pt-20 md:pt-24 pb-12 md:pb-20 z-20 flex items-center transition-colors duration-500"
+                className="relative min-h-screen px-3 sm:px-4 md:px-6 lg:px-12 pt-16 sm:pt-20 md:pt-24 pb-8 sm:pb-12 md:pb-20 z-20 flex items-center transition-colors duration-500"
                 style={{backgroundColor: currentTheme.bg}}>
                 <div className="max-w-[1400px] mx-auto w-full">
-                    {/* Main heading */}
+                    {/* Main heading - Responsive text sizes */}
                     <motion.h1
                         initial={{opacity: 0, y: 30}}
                         animate={{opacity: 1, y: 0}}
                         transition={{duration: 0.8}}
-                        className="text-[13vw] sm:text-[12vw] md:text-[10vw] lg:text-[8.5vw] font-black leading-[0.85] tracking-tighter mb-8 md:mb-12 transition-colors duration-500"
+                        className="text-[15vw] sm:text-[13vw] md:text-[10vw] lg:text-[8.5vw] font-black leading-[0.85] tracking-tighter mb-6 sm:mb-8 md:mb-12 transition-colors duration-500"
                         style={{fontFamily: 'Arial Black, sans-serif', color: currentTheme.text}}
                     >
                         Your Portfolio, Reimagined.
@@ -284,81 +299,101 @@ const LandingPage = () => {
                         initial={{opacity: 0, y: 20}}
                         animate={{opacity: 1, y: 0}}
                         transition={{duration: 0.8, delay: 0.3}}
-                        className="max-w-md mb-8 md:mb-12"
+                        className="max-w-md mb-6 sm:mb-8 md:mb-12"
                     >
-                        <p className="text-sm md:text-base lg:text-lg leading-relaxed transition-colors duration-500"
+                        <p className="text-xs sm:text-sm md:text-base lg:text-lg leading-relaxed transition-colors duration-500"
                            style={{fontFamily: 'Georgia, serif', color: currentTheme.textMuted}}>
-                            Images that follow your cursor. A trail of memories that appear with every movement,
-                            transforming static galleries into dynamic experiences.
+                            Create an interactive portfolio that moves with your cursor. Transform your work into
+                            a dynamic, memorable experience. Share it like it's your own website.
                         </p>
                     </motion.div>
 
-                    {/* CTA buttons */}
+                    {/* CTA buttons - Responsive */}
                     <motion.div
                         initial={{opacity: 0}}
                         animate={{opacity: 1}}
                         transition={{duration: 0.8, delay: 0.6}}
-                        className="flex flex-col sm:flex-row flex-wrap gap-3 md:gap-4"
+                        className="flex flex-col sm:flex-row flex-wrap gap-2.5 sm:gap-3 md:gap-4"
                     >
-                        <Link
-                            to="/create"
-                            className="px-6 md:px-8 py-3 md:py-4 font-bold text-xs md:text-sm tracking-wide transition-all duration-300 text-center"
-                            style={{
-                                backgroundColor: currentTheme.accent,
-                                color: isDark ? '#0a0a0a' : '#f5f3ef'
-                            }}
-                            onMouseEnter={(e) => e.target.style.backgroundColor = currentTheme.accentHover}
-                            onMouseLeave={(e) => e.target.style.backgroundColor = currentTheme.accent}
-                        >
-                            GET STARTED
-                        </Link>
-                        <Link
-                            to={isAuthenticated ? "/dashboard" : "/signup"}
-                            className="px-6 md:px-8 py-3 md:py-4 border-2 font-bold text-xs md:text-sm tracking-wide transition-all duration-300 text-center"
-                            style={{
-                                borderColor: currentTheme.accent,
-                                color: currentTheme.accent,
-                            }}
-                            onMouseEnter={(e) => {
-                                e.target.style.backgroundColor = currentTheme.accent;
-                                e.target.style.color = isDark ? '#0a0a0a' : '#f5f3ef';
-                            }}
-                            onMouseLeave={(e) => {
-                                e.target.style.backgroundColor = 'transparent';
-                                e.target.style.color = currentTheme.accent;
-                            }}
-                        >
-                            {isAuthenticated ? "GO TO DASHBOARD" : "SIGN UP FREE"}
-                        </Link>
+                        {isAuthenticated ? (
+                            // Logged-in user CTAs
+                            <Link
+                                to="/dashboard"
+                                className="px-5 sm:px-6 md:px-8 py-2.5 sm:py-3 md:py-4 font-bold text-[10px] sm:text-xs md:text-sm tracking-wide transition-all duration-300 text-center"
+                                style={{
+                                    backgroundColor: currentTheme.accent,
+                                    color: isDark ? '#0a0a0a' : '#f5f3ef'
+                                }}
+                                onMouseEnter={(e) => e.target.style.backgroundColor = currentTheme.accentHover}
+                                onMouseLeave={(e) => e.target.style.backgroundColor = currentTheme.accent}
+                            >
+                                GO TO DASHBOARD
+                            </Link>
+                        ) : (
+                            // Logged-out user CTAs
+                            <>
+                                <Link
+                                    to="/create"
+                                    className="px-5 sm:px-6 md:px-8 py-2.5 sm:py-3 md:py-4 font-bold text-[10px] sm:text-xs md:text-sm tracking-wide transition-all duration-300 text-center"
+                                    style={{
+                                        backgroundColor: currentTheme.accent,
+                                        color: isDark ? '#0a0a0a' : '#f5f3ef'
+                                    }}
+                                    onMouseEnter={(e) => e.target.style.backgroundColor = currentTheme.accentHover}
+                                    onMouseLeave={(e) => e.target.style.backgroundColor = currentTheme.accent}
+                                >
+                                    GET STARTED
+                                </Link>
+                                <Link
+                                    to="/signup"
+                                    className="px-5 sm:px-6 md:px-8 py-2.5 sm:py-3 md:py-4 border-2 font-bold text-[10px] sm:text-xs md:text-sm tracking-wide transition-all duration-300 text-center"
+                                    style={{
+                                        borderColor: currentTheme.accent,
+                                        color: currentTheme.accent,
+                                    }}
+                                    onMouseEnter={(e) => {
+                                        e.target.style.backgroundColor = currentTheme.accent;
+                                        e.target.style.color = isDark ? '#0a0a0a' : '#f5f3ef';
+                                    }}
+                                    onMouseLeave={(e) => {
+                                        e.target.style.backgroundColor = 'transparent';
+                                        e.target.style.color = currentTheme.accent;
+                                    }}
+                                >
+                                    SIGN UP FREE
+                                </Link>
+                            </>
+                        )}
                     </motion.div>
                 </div>
             </section>
 
-            {/* How it works */}
-            <section className="py-16 md:py-24 lg:py-32 px-4 md:px-6 lg:px-12 z-20 transition-colors duration-500"
+            {/* How it works - Responsive */}
+            <section
+                className="py-12 sm:py-16 md:py-24 lg:py-32 px-3 sm:px-4 md:px-6 lg:px-12 z-20 transition-colors duration-500"
                      style={{backgroundColor: currentTheme.bgAlt}}>
                 <div className="max-w-[1400px] mx-auto">
-                    <h2 className="text-4xl md:text-5xl lg:text-7xl font-black mb-12 md:mb-20 transition-colors duration-500"
+                    <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-black mb-8 sm:mb-12 md:mb-20 transition-colors duration-500"
                         style={{color: currentTheme.text}}>
                         How it works
                     </h2>
 
-                    <div className="grid sm:grid-cols-2 md:grid-cols-3 gap-8 md:gap-12 lg:gap-16">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-6 sm:gap-8 md:gap-12 lg:gap-16">
                         {[
                             {
                                 num: '01',
                                 title: 'Upload',
-                                desc: 'Drop your images. Minimum 10 photos.'
+                                desc: 'Add your best work. Start with at least one image.'
                             },
                             {
                                 num: '02',
                                 title: 'Customize',
-                                desc: 'Adjust threshold sensitivity. Control how images appear as you move.'
+                                desc: 'Fine-tune cursor sensitivity and visual mood. Make it yours.'
                             },
                             {
                                 num: '03',
                                 title: 'Share',
-                                desc: 'One link. Instant interactive gallery.'
+                                desc: 'One link. Your interactive portfolio, ready to impress.'
                             }
                         ].map((item, idx) => (
                             <motion.div
@@ -369,11 +404,11 @@ const LandingPage = () => {
                                 viewport={{once: true}}
                             >
                                 <div
-                                    className="text-6xl md:text-7xl lg:text-8xl font-black mb-3 md:mb-4 transition-colors duration-500"
+                                    className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-black mb-2 sm:mb-3 md:mb-4 transition-colors duration-500"
                                      style={{color: currentTheme.text, opacity: isDark ? 0.1 : 0.2}}>{item.num}</div>
-                                <h3 className="text-xl md:text-2xl font-black mb-2 md:mb-3 transition-colors duration-500"
+                                <h3 className="text-lg sm:text-xl md:text-2xl font-black mb-1.5 sm:mb-2 md:mb-3 transition-colors duration-500"
                                     style={{color: currentTheme.text}}>{item.title}</h3>
-                                <p className="text-sm md:text-base leading-relaxed opacity-70 transition-colors duration-500"
+                                <p className="text-xs sm:text-sm md:text-base leading-relaxed opacity-70 transition-colors duration-500"
                                    style={{fontFamily: 'Georgia, serif', color: currentTheme.textMuted}}>
                                     {item.desc}
                                 </p>
@@ -383,8 +418,9 @@ const LandingPage = () => {
                 </div>
             </section>
 
-            {/* Live Demo Section */}
-            <section className="py-16 md:py-24 lg:py-32 px-4 md:px-6 lg:px-12 z-20 transition-colors duration-500"
+            {/* Live Demo Section - Responsive */}
+            <section
+                className="py-12 sm:py-16 md:py-24 lg:py-32 px-3 sm:px-4 md:px-6 lg:px-12 z-20 transition-colors duration-500"
                      style={{backgroundColor: currentTheme.bg}}
                      ref={demoSectionRef}>
                 <div className="max-w-[1400px] mx-auto">
@@ -394,15 +430,15 @@ const LandingPage = () => {
                         whileInView={{opacity: 1, y: 0}}
                         transition={{duration: 0.8}}
                         viewport={{once: true}}
-                        className="mb-8 md:mb-16 text-center"
+                        className="mb-6 sm:mb-8 md:mb-16 text-center"
                     >
-                        <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-7xl font-black mb-4 md:mb-6 transition-colors duration-500"
+                        <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-7xl font-black mb-3 sm:mb-4 md:mb-6 transition-colors duration-500"
                             style={{fontFamily: 'Arial Black, sans-serif', color: currentTheme.text}}>
                             EXPERIENCE IT
                         </h2>
-                        <p className="text-xs tracking-[0.2em] md:tracking-[0.3em] uppercase transition-colors duration-500"
+                        <p className="text-[9px] sm:text-xs tracking-wider transition-colors duration-500"
                            style={{color: currentTheme.textDim}}>
-                            {window.innerWidth > 768 ? 'Glide across the canvas below' : 'Drag your finger across the canvas'}
+                            {isMobile ? 'Drag your finger across the canvas' : 'Move across the canvas below'}
                         </p>
                     </motion.div>
 
@@ -416,16 +452,16 @@ const LandingPage = () => {
                     >
                         {/* Subtle corner decorations */}
                         <div
-                            className="absolute -top-2 -left-2 w-6 h-6 md:w-8 md:h-8 border-l-2 border-t-2 z-10 transition-colors duration-500"
+                            className="absolute -top-1.5 sm:-top-2 -left-1.5 sm:-left-2 w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 border-l-2 border-t-2 z-10 transition-colors duration-500"
                             style={{borderColor: currentTheme.borderAlt}}></div>
                         <div
-                            className="absolute -top-2 -right-2 w-6 h-6 md:w-8 md:h-8 border-r-2 border-t-2 z-10 transition-colors duration-500"
+                            className="absolute -top-1.5 sm:-top-2 -right-1.5 sm:-right-2 w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 border-r-2 border-t-2 z-10 transition-colors duration-500"
                             style={{borderColor: currentTheme.borderAlt}}></div>
                         <div
-                            className="absolute -bottom-2 -left-2 w-6 h-6 md:w-8 md:h-8 border-l-2 border-b-2 z-10 transition-colors duration-500"
+                            className="absolute -bottom-1.5 sm:-bottom-2 -left-1.5 sm:-left-2 w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 border-l-2 border-b-2 z-10 transition-colors duration-500"
                             style={{borderColor: currentTheme.borderAlt}}></div>
                         <div
-                            className="absolute -bottom-2 -right-2 w-6 h-6 md:w-8 md:h-8 border-r-2 border-b-2 z-10 transition-colors duration-500"
+                            className="absolute -bottom-1.5 sm:-bottom-2 -right-1.5 sm:-right-2 w-5 h-5 sm:w-6 sm:h-6 md:w-8 md:h-8 border-r-2 border-b-2 z-10 transition-colors duration-500"
                             style={{borderColor: currentTheme.borderAlt}}></div>
 
                         {/* Demo gallery - Responsive height */}
@@ -433,15 +469,15 @@ const LandingPage = () => {
                              style={{
                                  backgroundColor: isDark ? '#000000' : '#ede9e0',
                                  borderColor: currentTheme.border,
-                                 height: window.innerWidth <= 768 ? '60vh' : '65vh',
-                                 minHeight: window.innerWidth <= 768 ? '400px' : '500px',
-                                 maxHeight: window.innerWidth <= 768 ? '600px' : '700px'
+                                 height: isMobile ? '50vh' : '65vh',
+                                 minHeight: isMobile ? '350px' : '500px',
+                                 maxHeight: isMobile ? '500px' : '700px'
                              }}
                              ref={canvasRef}
                         >
                             <CursorTrailGallery
                                 images={demoImages}
-                                threshold={40}
+                                threshold={isMobile ? 60 : 40}
                                 showControls={false}
                                 clearOnLeave={true}
                                 theme={{
@@ -458,18 +494,19 @@ const LandingPage = () => {
                         whileInView={{opacity: 1}}
                         transition={{duration: 0.8, delay: 0.4}}
                         viewport={{once: true}}
-                        className="mt-8 md:mt-12 text-center"
+                        className="mt-6 sm:mt-8 md:mt-12 text-center"
                     >
-                        <p className="text-xs tracking-wider transition-colors duration-500"
+                        <p className="text-[9px] sm:text-xs tracking-wider transition-colors duration-500"
                            style={{color: currentTheme.textDim}}>
-                            {window.innerWidth > 768 ? 'Cursor-driven image trail · Adjustable sensitivity' : 'Touch-driven image trail · Adjustable sensitivity'}
+                            {isMobile ? 'Touch-driven image trail · Adjustable sensitivity' : 'Cursor-driven image trail · Adjustable sensitivity'}
                         </p>
                     </motion.div>
                 </div>
             </section>
 
-            {/* Final CTA Section */}
-            <section className="py-16 md:py-24 lg:py-32 px-4 md:px-6 lg:px-12 z-20 transition-colors duration-500"
+            {/* Final CTA Section - Responsive */}
+            <section
+                className="py-12 sm:py-16 md:py-24 lg:py-32 px-3 sm:px-4 md:px-6 lg:px-12 z-20 transition-colors duration-500"
                      style={{backgroundColor: currentTheme.bgAlt}}>
                 <div className="max-w-[1400px] mx-auto text-center">
                     <motion.div
@@ -478,37 +515,70 @@ const LandingPage = () => {
                         transition={{duration: 0.8}}
                         viewport={{once: true}}
                     >
-                        <h2 className="text-4xl sm:text-5xl md:text-6xl lg:text-8xl font-black mb-8 md:mb-12 transition-colors duration-500"
-                            style={{fontFamily: 'Arial Black, sans-serif', color: currentTheme.text}}>
-                            START NOW
-                        </h2>
-                        <Link
-                            to="/create"
-                            className="inline-flex items-center gap-2 md:gap-3 px-6 md:px-8 py-3 md:py-4 font-bold text-sm md:text-lg transition-all duration-300"
-                            style={{
-                                backgroundColor: currentTheme.accent,
-                                color: isDark ? '#0a0a0a' : '#f5f3ef'
-                            }}
-                            onMouseEnter={(e) => e.target.style.backgroundColor = currentTheme.accentHover}
-                            onMouseLeave={(e) => e.target.style.backgroundColor = currentTheme.accent}
-                        >
-                            CREATE YOUR GALLERY
-                            <ArrowRight className="w-4 h-4 md:w-5 md:h-5"/>
-                        </Link>
+                        {isAuthenticated ? (
+                            // Logged-in user final CTA
+                            <>
+                                <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl xl:text-7xl font-black mb-3 sm:mb-4 md:mb-6 transition-colors duration-500"
+                                    style={{fontFamily: 'Arial Black, sans-serif', color: currentTheme.text}}>
+                                    Welcome Back{user?.name ? `, ${user.name.split(' ')[0]}` : ''}
+                                </h2>
+                                <p className="text-xs sm:text-sm md:text-base lg:text-lg xl:text-xl mb-6 sm:mb-8 md:mb-12 max-w-2xl mx-auto transition-colors duration-500"
+                                   style={{fontFamily: 'Georgia, serif', color: currentTheme.textMuted}}>
+                                    Ready to polish your portfolio? Manage your gallery, explore new features, or refine
+                                    your interactive experience.
+                                </p>
+                                <Link
+                                    to="/dashboard"
+                                    className="inline-flex items-center gap-2 md:gap-3 px-5 sm:px-6 md:px-8 py-2.5 sm:py-3 md:py-4 font-bold text-xs sm:text-sm md:text-lg transition-all duration-300"
+                                    style={{
+                                        backgroundColor: currentTheme.accent,
+                                        color: isDark ? '#0a0a0a' : '#f5f3ef'
+                                    }}
+                                    onMouseEnter={(e) => e.target.style.backgroundColor = currentTheme.accentHover}
+                                    onMouseLeave={(e) => e.target.style.backgroundColor = currentTheme.accent}
+                                >
+                                    <Eye className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5"/>
+                                    GO TO DASHBOARD
+                                </Link>
+                            </>
+                        ) : (
+                            // Logged-out user final CTA
+                            <>
+                                <h2 className="text-3xl sm:text-4xl md:text-5xl lg:text-6xl xl:text-8xl font-black mb-6 sm:mb-8 md:mb-12 transition-colors duration-500"
+                                    style={{fontFamily: 'Arial Black, sans-serif', color: currentTheme.text}}>
+                                    START NOW
+                                </h2>
+                                <Link
+                                    to="/create"
+                                    className="inline-flex items-center gap-2 md:gap-3 px-5 sm:px-6 md:px-8 py-2.5 sm:py-3 md:py-4 font-bold text-xs sm:text-sm md:text-lg transition-all duration-300"
+                                    style={{
+                                        backgroundColor: currentTheme.accent,
+                                        color: isDark ? '#0a0a0a' : '#f5f3ef'
+                                    }}
+                                    onMouseEnter={(e) => e.target.style.backgroundColor = currentTheme.accentHover}
+                                    onMouseLeave={(e) => e.target.style.backgroundColor = currentTheme.accent}
+                                >
+                                    CREATE YOUR PORTFOLIO
+                                    <ArrowRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 md:w-5 md:h-5"/>
+                                </Link>
+                            </>
+                        )}
                     </motion.div>
                 </div>
             </section>
 
-            {/* Footer */}
-            <footer className="py-8 md:py-12 px-4 md:px-6 lg:px-12 z-20 border-t transition-all duration-500"
+            {/* Footer - Responsive */}
+            <footer
+                className="py-4 sm:py-6 md:py-8 px-3 sm:px-4 md:px-6 lg:px-12 z-20 border-t transition-all duration-500"
                     style={{backgroundColor: currentTheme.bg, borderColor: currentTheme.border}}>
                 <div
-                    className="max-w-[1400px] mx-auto flex flex-col md:flex-row justify-between items-center gap-4 md:gap-6">
-                    <div className="text-xs md:text-sm font-bold tracking-wider transition-colors duration-500"
+                    className="max-w-[1000px] mx-auto flex flex-col sm:flex-row justify-between items-center gap-2 sm:gap-3 md:gap-4">
+                    <div
+                        className="text-[8px] sm:text-[10px] md:text-xs font-bold tracking-[0.15em] sm:tracking-[0.2em] transition-colors duration-500"
                          style={{color: currentTheme.text}}>
                         CURSOR GALLERY &copy; 2025
                     </div>
-                    <div className="text-xs md:text-sm opacity-60 transition-colors duration-500"
+                    <div className="text-[8px] sm:text-[10px] md:text-xs opacity-50 transition-colors duration-500"
                          style={{color: currentTheme.textMuted}}>
                         INTERACTIVE PORTFOLIO SYSTEM
                     </div>

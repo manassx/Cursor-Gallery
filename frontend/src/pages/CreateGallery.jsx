@@ -1,4 +1,4 @@
-import {useState, useEffect} from 'react';
+import {useState, useEffect, useRef} from 'react';
 import {useNavigate} from 'react-router-dom';
 import {ArrowLeft, ArrowRight} from 'lucide-react';
 import {motion} from 'framer-motion';
@@ -15,6 +15,8 @@ const CreateGallery = () => {
     const navigate = useNavigate();
     const {createGallery, uploadImages, updateGallery, isLoading} = useGalleryStore();
     const {isDark, currentTheme} = useTheme();
+    const uploadInProgressRef = useRef(false);
+    const abortControllerRef = useRef(null);
 
     const [step, setStep] = useState(1); // 1: Details, 2: Upload, 3: Processing
     const [galleryData, setGalleryData] = useState({
@@ -55,7 +57,7 @@ const CreateGallery = () => {
         e.preventDefault();
 
         if (!galleryData.name.trim()) {
-            toast.error('Please enter a gallery name');
+            toast.error('Please enter a portfolio name');
             return;
         }
 
@@ -66,6 +68,45 @@ const CreateGallery = () => {
         setUploadedFiles(files);
     };
 
+    const handleBackClick = () => {
+        // If we're in step 3 (processing), show confirmation dialog
+        if (step === 3 && uploadInProgressRef.current) {
+            const confirmed = window.confirm(
+                '⚠️ Portfolio creation is in progress!\n\n' +
+                'Going back will cancel the upload and delete any partially uploaded data.\n\n' +
+                'Are you sure you want to go back?'
+            );
+
+            if (confirmed) {
+                // Cancel the upload
+                if (abortControllerRef.current) {
+                    abortControllerRef.current.abort();
+                }
+                uploadInProgressRef.current = false;
+
+                // Clean up any created gallery
+                if (createdGalleryId) {
+                    // Attempt to delete the partially created gallery
+                    api.delete(`/api/galleries/${createdGalleryId}`)
+                        .catch(err => console.error('Failed to clean up gallery:', err));
+                }
+
+                toast.error('Portfolio creation cancelled', {id: 'cancelled'});
+
+                // Navigate back to dashboard
+                navigate('/dashboard');
+            }
+            return;
+        }
+
+        // Normal back navigation for other steps
+        if (step > 1 && step < 3) {
+            setStep(step - 1);
+        } else {
+            navigate('/dashboard');
+        }
+    };
+
     const handleCreateGallery = async () => {
         if (uploadedFiles.length === 0) {
             toast.error('Please upload at least 1 image');
@@ -73,7 +114,9 @@ const CreateGallery = () => {
         }
 
         setStep(3);
-        setProcessingStep(0); // Start at 0 for compression
+        setProcessingStep(0);
+        uploadInProgressRef.current = true;
+        abortControllerRef.current = new AbortController();
 
         try {
             // Step 0: Compress images (if enabled in preferences)
@@ -99,9 +142,14 @@ const CreateGallery = () => {
                 filesToUpload = compressedFiles;
             }
 
+            // Check if aborted
+            if (abortControllerRef.current.signal.aborted) {
+                throw new Error('Upload cancelled by user');
+            }
+
             // Step 1: Create gallery with user's default threshold
             setProcessingStep(1);
-            toast.loading('Creating gallery...', {id: 'create'});
+            toast.loading('Creating your portfolio...', {id: 'create'});
 
             console.log('Creating gallery with threshold:', userPreferences.defaultThreshold);
             const newGallery = await createGallery({
@@ -115,7 +163,12 @@ const CreateGallery = () => {
             });
 
             setCreatedGalleryId(newGallery.id);
-            toast.success('Gallery created!', {id: 'create'});
+            toast.success('Portfolio created!', {id: 'create'});
+
+            // Check if aborted
+            if (abortControllerRef.current.signal.aborted) {
+                throw new Error('Upload cancelled by user');
+            }
 
             // Step 2: Upload images
             setProcessingStep(2);
@@ -126,16 +179,22 @@ const CreateGallery = () => {
             setUploadProgress(100);
             toast.success(`${result.uploadedCount} images uploaded!`, {id: 'upload'});
 
+            // Check if aborted
+            if (abortControllerRef.current.signal.aborted) {
+                throw new Error('Upload cancelled by user');
+            }
+
             // Step 3: Mark as ready
             setProcessingStep(3);
-            toast.loading('Finalizing gallery...', {id: 'finalize'});
+            toast.loading('Finalizing portfolio...', {id: 'finalize'});
 
             await updateGallery(newGallery.id, {
                 status: 'analyzed',
                 analysis_complete: true
             });
 
-            toast.success('Gallery ready!', {id: 'finalize'});
+            toast.success('Portfolio ready!', {id: 'finalize'});
+            uploadInProgressRef.current = false;
 
             // Navigate to gallery editor
             setTimeout(() => {
@@ -143,13 +202,21 @@ const CreateGallery = () => {
             }, 1000);
 
         } catch (error) {
+            uploadInProgressRef.current = false;
+
+            // Don't show error toast if user cancelled
+            if (error.message === 'Upload cancelled by user') {
+                console.log('Upload was cancelled by user');
+                return;
+            }
+
             console.error('Error creating gallery:', error);
             console.error('Error details:', {
                 message: error.message,
                 status: error.status,
                 response: error.response
             });
-            toast.error(error.message || 'Failed to create gallery. Please try again.');
+            toast.error(error.message || 'Failed to create portfolio. Please try again.');
             setStep(2);
             setProcessingStep(0);
             setUploadProgress(0);
@@ -191,7 +258,7 @@ const CreateGallery = () => {
 
             {/* Floating Back Button */}
             <button
-                onClick={() => step > 1 && step < 3 ? setStep(step - 1) : navigate('/dashboard')}
+                onClick={handleBackClick}
                 className="fixed top-4 left-4 md:top-6 md:left-6 z-50 flex items-center gap-2 px-3 py-2 md:px-4 md:py-2 rounded-lg font-bold text-xs tracking-wide transition-all duration-300 opacity-70 hover:opacity-100"
                 style={{
                     backgroundColor: currentTheme.bgAlt,
@@ -230,13 +297,13 @@ const CreateGallery = () => {
                                 className="text-xl md:text-3xl lg:text-4xl xl:text-5xl font-black tracking-tight mb-2 md:mb-3 transition-colors duration-500"
                                 style={{fontFamily: 'Arial Black, sans-serif', color: currentTheme.text}}
                             >
-                                Name Your Gallery
+                                Name Your Portfolio
                             </h1>
                             <p
                                 className="text-xs md:text-sm lg:text-base transition-colors duration-500"
                                 style={{fontFamily: 'Georgia, serif', color: currentTheme.textMuted}}
                             >
-                                Give it a title. Add context if you want.
+                                Give it a memorable name. This is your creative space.
                             </p>
                         </div>
 
@@ -247,7 +314,7 @@ const CreateGallery = () => {
                                     className="block text-xs md:text-sm font-bold mb-1.5 md:mb-2 tracking-wide transition-colors duration-500"
                                     style={{color: currentTheme.text}}
                                 >
-                                    TITLE
+                                    PORTFOLIO NAME
                                 </label>
                                 <input
                                     type="text"
@@ -260,7 +327,7 @@ const CreateGallery = () => {
                                         borderColor: currentTheme.border,
                                         color: currentTheme.text,
                                     }}
-                                    placeholder="Summer in Tokyo"
+                                    placeholder="Sarah Chen Photography"
                                     required
                                     onFocus={(e) => e.target.style.borderColor = currentTheme.accent}
                                     onBlur={(e) => e.target.style.borderColor = currentTheme.border}
@@ -273,7 +340,7 @@ const CreateGallery = () => {
                                     className="block text-xs md:text-sm font-bold mb-1.5 md:mb-2 tracking-wide transition-colors duration-500"
                                     style={{color: currentTheme.text}}
                                 >
-                                    DESCRIPTION (OPTIONAL)
+                                    TAGLINE (OPTIONAL)
                                 </label>
                                 <textarea
                                     id="description"
@@ -286,7 +353,7 @@ const CreateGallery = () => {
                                         borderColor: currentTheme.border,
                                         color: currentTheme.text,
                                     }}
-                                    placeholder="A collection of moments from..."
+                                    placeholder="Visual storyteller capturing life's fleeting moments..."
                                     onFocus={(e) => e.target.style.borderColor = currentTheme.accent}
                                     onBlur={(e) => e.target.style.borderColor = currentTheme.border}
                                 />
@@ -358,7 +425,7 @@ const CreateGallery = () => {
                                         whileHover={uploadedFiles.length >= 1 ? {scale: 1.02} : {}}
                                         whileTap={uploadedFiles.length >= 1 ? {scale: 0.98} : {}}
                                     >
-                                        <span>CREATE GALLERY</span>
+                                        <span>BUILD PORTFOLIO</span>
                                     </motion.button>
                                     {uploadedFiles.length < 1 && (
                                         <p
@@ -391,13 +458,13 @@ const CreateGallery = () => {
                                 className="text-xl md:text-3xl lg:text-4xl xl:text-5xl font-black mb-2 md:mb-3 transition-colors duration-500"
                                 style={{color: currentTheme.text}}
                             >
-                                Working On It
+                                Crafting Your Portfolio
                             </h2>
                             <p
                                 className="text-xs md:text-sm lg:text-base transition-colors duration-500"
                                 style={{fontFamily: 'Georgia, serif', color: currentTheme.textMuted}}
                             >
-                                Processing your images and setting things up
+                                Setting up your interactive canvas. Almost there...
                             </p>
                         </div>
 
@@ -419,7 +486,7 @@ const CreateGallery = () => {
                                 className="text-xs md:text-sm text-center transition-colors duration-500"
                                 style={{color: currentTheme.text}}
                             >
-                                Takes about 2 minutes. Keep this window open.
+                                This usually takes about 2 minutes. Keep this window open.
                             </p>
                         </div>
                     </motion.div>

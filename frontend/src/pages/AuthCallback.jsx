@@ -15,10 +15,20 @@ const AuthCallback = () => {
 
     const handleCallback = async () => {
         try {
-            console.log('Auth callback triggered');
+            console.log('===== AUTH CALLBACK STARTED =====');
             console.log('Full URL:', window.location.href);
             console.log('Hash:', window.location.hash);
             console.log('Search:', window.location.search);
+            console.log('Port:', window.location.port);
+
+            // CRITICAL FIX: Check if we're on the wrong port (Supabase redirected to 3000 instead of 5173)
+            if (window.location.port === '3000' && window.location.hash) {
+                console.warn('⚠️ Detected redirect to port 3000 instead of 5173!');
+                console.log('Redirecting to correct port with hash...');
+                const correctUrl = `http://${window.location.hostname}:5173/auth/callback${window.location.hash}`;
+                window.location.href = correctUrl;
+                return;
+            }
 
             // Check both hash and query parameters
             const hashParams = new URLSearchParams(window.location.hash.substring(1));
@@ -67,72 +77,71 @@ const AuthCallback = () => {
             });
 
             if (!userResponse.ok) {
-                console.error('Failed to fetch user data:', await userResponse.text());
-                throw new Error('Failed to fetch user data');
+                const errorText = await userResponse.text();
+                console.error('Failed to fetch user data:', errorText);
+                throw new Error('Failed to fetch user data from Supabase');
             }
 
             const userData = await userResponse.json();
-            console.log('User data received:', userData.email);
+            console.log('User data received from Supabase:', {
+                email: userData.email,
+                id: userData.id,
+                name: userData.user_metadata?.full_name
+            });
 
-            // Fetch custom name from backend if it exists
-            let customName = userData.user_metadata?.full_name || userData.user_metadata?.name || userData.email.split('@')[0];
+            // CRITICAL FIX: Call our backend's /api/auth/google endpoint
+            // This ensures account unification happens properly
+            const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
+            console.log('Calling backend /api/auth/google for unification...');
+            console.log('API URL:', API_URL);
 
-            try {
-                const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-                const backendResponse = await fetch(`${API_URL}/api/auth/me`, {
-                    headers: {
-                        'Authorization': `Bearer ${accessToken}`
-                    }
-                });
+            const backendResponse = await fetch(`${API_URL}/api/auth/google`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    idToken: accessToken,
+                    email: userData.email,
+                    name: userData.user_metadata?.full_name || userData.user_metadata?.name || userData.email.split('@')[0]
+                })
+            });
 
-                if (backendResponse.ok) {
-                    const backendData = await backendResponse.json();
-                    if (backendData.user && backendData.user.name) {
-                        customName = backendData.user.name;
-                        console.log('Using custom name from backend:', customName);
-                    }
-                }
-            } catch (e) {
-                console.log('Could not fetch custom name, using default');
+            if (!backendResponse.ok) {
+                const errorData = await backendResponse.json().catch(() => ({}));
+                console.error('Backend auth failed:', errorData);
+                throw new Error(errorData.error || 'Backend authentication failed');
             }
 
-            // Store auth data
+            const backendData = await backendResponse.json();
+            console.log('Backend auth successful:', {
+                userId: backendData.user.id,
+                email: backendData.user.email,
+                name: backendData.user.name
+            });
+
+            // Store auth data from backend (this includes unified account)
             const authData = {
-                user: {
-                    id: userData.id,
-                    email: userData.email,
-                    name: customName,
-                    createdAt: userData.created_at
-                },
-                token: accessToken,
+                user: backendData.user,
+                token: backendData.token,
                 isAuthenticated: true
             };
 
             // Update auth store
             localStorage.setItem('auth-storage', JSON.stringify({state: authData}));
 
-            // Create user settings if they don't exist
-            try {
-                const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000';
-                await fetch(`${API_URL}/api/user/settings`, {
-                    method: 'GET',
-                    headers: {
-                        'Authorization': `Bearer ${accessToken}`
-                    }
-                });
-            } catch (e) {
-                console.log('Settings might not exist yet, will be created on first access');
-            }
-
-            console.log('Authentication successful!');
+            console.log('Authentication successful! Redirecting to dashboard...');
             toast.success('Successfully signed in with Google!');
 
             // Reload to update auth state
             window.location.href = '/dashboard';
 
         } catch (error) {
-            console.error('Callback error:', error);
-            toast.error('Authentication failed');
+            console.error('===== CALLBACK ERROR =====');
+            console.error('Error details:', error);
+            console.error('Error message:', error.message);
+            console.error('========================');
+            toast.error(error.message || 'Authentication failed');
             navigate('/login');
         }
     };

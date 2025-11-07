@@ -25,6 +25,8 @@ const PublicGallery = () => {
 
             // Fetch gallery from backend
             const galleryData = await apiGet(`/api/gallery/${id}`);
+            console.log('Loaded public gallery data:', galleryData);
+            console.log('Public gallery images:', galleryData.images);
 
             // Transform images to the format expected by CursorTrailGallery
             const formattedGallery = {
@@ -36,6 +38,7 @@ const PublicGallery = () => {
                     url: img.url,
                     thumbnail: img.thumbnail_url || img.url,
                     title: `Photo ${index + 1}`,
+                    metadata: img.metadata
                 })),
                 config: galleryData.config || {
                     threshold: 80,
@@ -44,11 +47,13 @@ const PublicGallery = () => {
                 },
             };
 
+            console.log('Formatted public gallery:', formattedGallery);
+            console.log('Formatted public images:', formattedGallery.images);
             setGallery(formattedGallery);
             setLoading(false);
         } catch (err) {
             console.error('Error loading gallery:', err);
-            setError(err.message || 'Failed to load gallery');
+            setError(err.message || 'Failed to load portfolio');
             setLoading(false);
         }
     };
@@ -66,7 +71,7 @@ const PublicGallery = () => {
             }}>
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-current mx-auto mb-4"></div>
-                    <p>Loading gallery...</p>
+                    <p>Loading portfolio...</p>
                 </div>
             </div>
         );
@@ -84,7 +89,7 @@ const PublicGallery = () => {
                 fontFamily: '"Inter", sans-serif'
             }}>
                 <div className="text-center">
-                    <p className="text-xl mb-4">😕 Gallery not found</p>
+                    <p className="text-xl mb-4">😕 Portfolio not found</p>
                     <p className="text-sm opacity-70 mb-6">{error}</p>
                     <button
                         onClick={() => navigate('/')}
@@ -113,7 +118,7 @@ const PublicGallery = () => {
                 fontFamily: '"Inter", sans-serif'
             }}>
                 <div className="text-center">
-                    <p className="text-xl mb-4">📷 No images in this gallery</p>
+                    <p className="text-xl mb-4">📷 This portfolio is empty</p>
                     <button
                         onClick={() => navigate('/')}
                         className="px-6 py-2 rounded-lg font-medium"
@@ -140,44 +145,16 @@ const PublicGallery = () => {
             position: 'relative',
             overflow: 'hidden'
         }}>
-            {/* Floating Home Button */}
-            <button
-                onClick={() => navigate('/')}
-                className="fixed top-4 left-4 md:top-6 md:left-6 z-50 flex items-center gap-2 px-3 py-2 md:px-4 md:py-2 rounded-lg font-bold text-xs tracking-wide transition-all duration-300 opacity-70 hover:opacity-100"
-                style={{
-                    backgroundColor: currentTheme.bgAlt,
-                    color: currentTheme.text,
-                    border: `1px solid ${currentTheme.border}`
-                }}
-                onMouseEnter={(e) => {
-                    e.target.style.backgroundColor = currentTheme.bg;
-                    e.target.style.borderColor = currentTheme.accent;
-                }}
-                onMouseLeave={(e) => {
-                    e.target.style.backgroundColor = currentTheme.bgAlt;
-                    e.target.style.borderColor = currentTheme.border;
-                }}
-            >
-                <Home size={16}/>
-                <span className="hidden sm:inline">CURSORGALLERY</span>
-            </button>
-
-            {/* Gallery Title (Optional) */}
-            <div className="fixed top-4 right-4 md:top-6 md:right-6 z-50 px-4 py-2 rounded-lg opacity-70"
-                 style={{
-                     backgroundColor: currentTheme.bgAlt,
-                     border: `1px solid ${currentTheme.border}`
-                 }}>
-                <p className="text-sm font-medium">{gallery.name}</p>
-                <p className="text-xs opacity-60">{gallery.images.length} photos</p>
-            </div>
-
             <CursorTrailGallery
                 images={gallery.images}
                 threshold={gallery.config.threshold}
                 showControls={true}
+                initialName={gallery.config.branding?.customName || ''}
+                initialNameLink={gallery.config.branding?.customNameLink || ''}
+                initialEmail={gallery.config.branding?.customEmail || ''}
+                galleryConfig={gallery.config}
                 theme={{
-                    controlsBg: currentTheme.bgAlt,
+                    controlsBg: currentTheme.bg,
                     controlsText: currentTheme.text
                 }}
             />

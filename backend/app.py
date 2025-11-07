@@ -9,6 +9,7 @@ from flask_cors import CORS
 from werkzeug.utils import secure_filename
 from PIL import Image
 import io
+import hashlib
 
 # Load environment variables from .env file
 load_dotenv()
@@ -24,8 +25,18 @@ SUPABASE_KEY = os.environ.get("SUPABASE_KEY")
 if not SUPABASE_URL or not SUPABASE_KEY:
     raise ValueError("SUPABASE_URL and SUPABASE_KEY must be set in the .env file")
 
-# Initialize Supabase client
+# Use a SINGLE Supabase client for all operations (including admin)
 supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
+admin_supabase: Client = supabase
+
+# Basic startup status message (critical environment vars)
+print(f"Supabase URL: {SUPABASE_URL}")
+print(f"Supabase Key starts with: {SUPABASE_KEY[:20]}... (length: {len(SUPABASE_KEY)})")
+
+if "service_role" in SUPABASE_KEY or SUPABASE_KEY.startswith("eyJ"):
+    print("[INFO] Using JWT key (likely service_role): Admin operations enabled.")
+else:
+    print("[WARNING] SUPABASE_KEY may be an anon key. Admin operations will NOT work unless you use your service_role key.")
 
 # Configuration
 STORAGE_BUCKET = "gallery-images"
@@ -51,13 +62,6 @@ def get_user_from_token():
         print(f"Token validation error: {e}")
         return None
 
-
-def get_token_from_request():
-    """Extract just the token from Authorization header"""
-    auth_header = request.headers.get('Authorization')
-    if not auth_header or not auth_header.startswith('Bearer '):
-        return None
-    return auth_header.replace('Bearer ', '')
 
 def generate_slug(name, user_id):
     """Generate a URL-friendly slug from gallery name"""
@@ -118,11 +122,254 @@ def home():
     return jsonify({"message": "CursorGallery API is running!", "version": "1.0.0"})
 
 
+@app.route("/api/auth/google", methods=["POST"])
+def google_auth():
+    """
+    Handle Google Sign-In authentication.
+    Expects JSON body with: { "idToken": "", "email": "", "name": "" }
+
+    This creates a Supabase user account (if needed) and returns a valid JWT token.
+
+    Updated: This endpoint now unifies Google and email/password users. If an account exists,
+    regardless of method, it is linked using the same password so login can happen from either side.
+    """
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON data"}), 400
+
+        id_token = data.get("idToken")
+        email = data.get("email")
+        name = data.get("name", "User")
+
+        if not id_token or not email:
+            return jsonify({"error": "Missing required fields (idToken, email)"}), 400
+
+        # Use a consistent password hash for Google login (unify logic)
+        secret_salt = os.environ.get("GOOGLE_AUTH_SALT", "cursor-gallery-google-auth-2024")
+        password_hash = hashlib.sha256(f"{email}{secret_salt}".encode()).hexdigest()
+        google_password = password_hash[:32]
+
+        try:
+            res = supabase.auth.sign_in_with_password({
+                "email": email,
+                "password": google_password
+            })
+
+            user = res.user
+            session = res.session
+
+            # Always update user metadata to latest name from Google
+            try:
+                admin_supabase.auth.admin.update_user_by_id(
+                    user.id,
+                    {"user_metadata": {"full_name": name, "auth_provider": "google"}}
+                )
+            except Exception as e:
+                pass  # Non-critical, ignore metadata update errors
+
+            # Always fetch latest user data
+            try:
+                fresh_user_response = admin_supabase.auth.admin.get_user_by_id(user.id)
+                if fresh_user_response and fresh_user_response.user:
+                    fresh_user = fresh_user_response.user
+                    return jsonify({
+                        "user": {
+                            "id": fresh_user.id,
+                            "email": fresh_user.email,
+                            "name": fresh_user.user_metadata.get("full_name", name),
+                            "createdAt": fresh_user.created_at
+                        },
+                        "token": session.access_token
+                    }), 200
+            except Exception as e:
+                pass  # If metadata fetch fails, fallback below
+
+            # Fallback on old token
+            return jsonify({
+                "user": {
+                    "id": user.id,
+                    "email": user.email,
+                    "name": user.user_metadata.get("full_name", name),
+                    "createdAt": user.created_at
+                },
+                "token": session.access_token
+            }), 200
+
+        except Exception:
+            try:
+                users_response = supabase.auth.admin.list_users()
+                existing_user = None
+
+                if users_response:
+                    for u in users_response:
+                        if u.email == email:
+                            existing_user = u
+                            break
+
+                if existing_user:
+                    # Unify account (update password for Google login)
+                    admin_supabase.auth.admin.update_user_by_id(
+                        existing_user.id,
+                        {
+                            "password": google_password,
+                            "user_metadata": {
+                                "full_name": name if name else existing_user.user_metadata.get("full_name", ""),
+                                "auth_provider": "unified"
+                            }
+                        }
+                    )
+                    final_signin = supabase.auth.sign_in_with_password({
+                        "email": email,
+                        "password": google_password
+                    })
+
+                    try:
+                        fresh_user_response = admin_supabase.auth.admin.get_user_by_id(final_signin.user.id)
+                        if fresh_user_response and fresh_user_response.user:
+                            fresh_user = fresh_user_response.user
+                            return jsonify({
+                                "user": {
+                                    "id": fresh_user.id,
+                                    "email": fresh_user.email,
+                                    "name": fresh_user.user_metadata.get("full_name", name),
+                                    "createdAt": fresh_user.created_at
+                                },
+                                "token": final_signin.session.access_token
+                            }), 200
+                    except Exception as e:
+                        pass  # metadata fetch error non-critical
+
+                    return jsonify({
+                        "user": {
+                            "id": final_signin.user.id,
+                            "email": final_signin.user.email,
+                            "name": final_signin.user.user_metadata.get("full_name", name),
+                            "createdAt": final_signin.user.created_at
+                        },
+                        "token": final_signin.session.access_token
+                    }), 200
+
+                else:
+                    # User does not exist, create new account
+                    signup_res = supabase.auth.sign_up({
+                        "email": email,
+                        "password": google_password,
+                        "options": {
+                            "data": {
+                                "full_name": name,
+                                "auth_provider": "google"
+                            }
+                        }
+                    })
+
+                    user = signup_res.user
+                    session = signup_res.session
+
+                    if user:
+                        try:
+                            user_settings_data = {
+                                "user_id": user.id,
+                                "profile": {
+                                    "bio": "",
+                                    "website": "",
+                                    "location": ""
+                                },
+                                "preferences": {
+                                    "emailNotifications": True,
+                                    "browserNotifications": False,
+                                    "galleryUpdates": True,
+                                    "marketingEmails": False,
+                                    "defaultGalleryVisibility": "private",
+                                    "autoSave": True,
+                                    "compressImages": True,
+                                    "defaultThreshold": 80,
+                                    "language": "en"
+                                }
+                            }
+                            supabase.table('user_settings').insert(user_settings_data).execute()
+                        except Exception:
+                            pass  # settings creation is non-critical
+
+                    if session and session.access_token:
+                        try:
+                            fresh_user_response = admin_supabase.auth.admin.get_user_by_id(user.id)
+                            if fresh_user_response and fresh_user_response.user:
+                                fresh_user = fresh_user_response.user
+                                return jsonify({
+                                    "user": {
+                                        "id": fresh_user.id,
+                                        "email": fresh_user.email,
+                                        "name": fresh_user.user_metadata.get("full_name", name),
+                                        "createdAt": fresh_user.created_at
+                                    },
+                                    "token": session.access_token
+                                }), 201
+                        except Exception as e:
+                            pass  # fallback below
+
+                        return jsonify({
+                            "user": {
+                                "id": user.id,
+                                "email": user.email,
+                                "name": user.user_metadata.get("full_name", name),
+                                "createdAt": user.created_at
+                            },
+                            "token": session.access_token
+                        }), 201
+                    else:
+                        try:
+                            signin_res = supabase.auth.sign_in_with_password({
+                                "email": email,
+                                "password": google_password
+                            })
+                            try:
+                                fresh_user_response = admin_supabase.auth.admin.get_user_by_id(signin_res.user.id)
+                                if fresh_user_response and fresh_user_response.user:
+                                    fresh_user = fresh_user_response.user
+                                    return jsonify({
+                                        "user": {
+                                            "id": fresh_user.id,
+                                            "email": fresh_user.email,
+                                            "name": fresh_user.user_metadata.get("full_name", name),
+                                            "createdAt": fresh_user.created_at
+                                        },
+                                        "token": signin_res.session.access_token
+                                    }), 201
+                            except Exception as e:
+                                pass  # fallback
+
+                            return jsonify({
+                                "user": {
+                                    "id": signin_res.user.id,
+                                    "email": signin_res.user.email,
+                                    "name": signin_res.user.user_metadata.get("full_name", name),
+                                    "createdAt": signin_res.user.created_at
+                                },
+                                "token": signin_res.session.access_token
+                            }), 201
+                        except Exception:
+                            return jsonify({
+                                "error": "Account created but email confirmation may be required. Please check your email or try logging in with email/password."
+                            }), 500
+
+            except Exception as lookup_error:
+                return jsonify({"error": f"Authentication error: {str(lookup_error)}"}), 500
+
+    except Exception as e:
+        error_message = str(e)
+        print(f"CRITICAL ERROR during Google authentication: {error_message}")
+        print(f"Error: {e}")
+        return jsonify({"error": f"Server error: {error_message}"}), 500
+
+
 @app.route("/api/auth/signup", methods=["POST"])
 def signup():
     """
     Handle user signup.
     Expects JSON body with: { "email": "", "password": "", "name": "" }
+
+    Also unifies with Google accounts if they previously registered via Google.
     """
     try:
         data = request.get_json()
@@ -136,13 +383,76 @@ def signup():
         if not email or not password or not name:
             return jsonify({"error": "Missing required fields (email, password, name)"}), 400
 
+        # First, check if this email already exists (may be a Google user)
+        try:
+            users_response = admin_supabase.auth.admin.list_users()
+            existing_user = None
+
+            if users_response:
+                for u in users_response:
+                    if u.email == email:
+                        existing_user = u
+                        break
+
+            if existing_user:
+                print(f"User {email} already exists from Google auth, unifying account...")
+
+                # Update password and mark as unified
+                admin_supabase.auth.admin.update_user_by_id(
+                    existing_user.id,
+                    {
+                        "password": password,
+                        "user_metadata": {
+                            "full_name": existing_user.user_metadata.get("full_name", name),
+                            "auth_provider": "unified"
+                        }
+                    }
+                )
+
+                # Sign in now with new password
+                res = supabase.auth.sign_in_with_password({
+                    "email": email,
+                    "password": password
+                })
+
+                try:
+                    fresh_user_response = admin_supabase.auth.admin.get_user_by_id(res.user.id)
+                    if fresh_user_response and fresh_user_response.user:
+                        fresh_user = fresh_user_response.user
+                        return jsonify({
+                            "user": {
+                                "id": fresh_user.id,
+                                "email": fresh_user.email,
+                                "name": fresh_user.user_metadata.get("full_name", name),
+                                "createdAt": fresh_user.created_at
+                            },
+                            "token": res.session.access_token,
+                            "message": "Account linked successfully"
+                        }), 200
+                except Exception as e:
+                    print(f"Error fetching fresh user data: {e}")
+
+                return jsonify({
+                    "user": {
+                        "id": res.user.id,
+                        "email": res.user.email,
+                        "name": res.user.user_metadata.get("full_name", name),
+                        "createdAt": res.user.created_at
+                    },
+                    "token": res.session.access_token,
+                    "message": "Account linked successfully"
+                }), 200
+        except Exception as e:
+            print(f"Error checking existing user: {e}")
+
         # Create a new user in Supabase Auth
         res = supabase.auth.sign_up({
             "email": email,
             "password": password,
             "options": {
                 "data": {
-                    "full_name": name
+                    "full_name": name,
+                    "auth_provider": "email"
                 }
             }
         })
@@ -177,6 +487,22 @@ def signup():
                 print(f"Error creating user settings: {e}")
 
         if session:
+            try:
+                fresh_user_response = supabase.auth.admin.get_user_by_id(user.id)
+                if fresh_user_response and fresh_user_response.user:
+                    fresh_user = fresh_user_response.user
+                    return jsonify({
+                        "user": {
+                            "id": fresh_user.id,
+                            "email": fresh_user.email,
+                            "name": fresh_user.user_metadata.get("full_name", name),
+                            "createdAt": fresh_user.created_at
+                        },
+                        "token": session.access_token
+                    }), 201
+            except Exception as e:
+                print(f"Error fetching fresh user data: {e}")
+
             return jsonify({
                 "user": {
                     "id": user.id,
@@ -213,54 +539,84 @@ def login():
     """
     Handle user login.
     Expects JSON body with: { "email": "", "password": "" }
+    Unifies Google and email/password login.
     """
     try:
-        print("=" * 50)
-        print("Login attempt received")
-        
         data = request.get_json()
         if not data:
-            print("Error: Missing JSON data")
             return jsonify({"error": "Missing JSON data"}), 400
 
         email = data.get("email")
         password = data.get("password")
-        
-        print(f"Email: {email}")
 
         if not email or not password:
-            print("Error: Missing email or password")
             return jsonify({"error": "Missing required fields (email, password)"}), 400
 
         # Sign in the user
-        print("Attempting Supabase sign in...")
         res = supabase.auth.sign_in_with_password({
             "email": email,
             "password": password
         })
-        
-        print("Sign in successful!")
+
         user = res.user
         session = res.session
 
-        return jsonify({
-            "user": {
-                "id": user.id,
-                "email": user.email,
-                "name": user.user_metadata.get("full_name", ""),
-                "createdAt": user.created_at
-            },
-            "token": session.access_token
-        }), 200
+        # Mark account as unified if they log in via email/password (even if originally Google)
+        try:
+            current_provider = user.user_metadata.get("auth_provider", "")
+            if current_provider != "unified":
+                supabase.auth.admin.update_user_by_id(
+                    user.id,
+                    {"user_metadata": {
+                        "full_name": user.user_metadata.get("full_name", ""),
+                        "auth_provider": "unified"
+                    }}
+                )
+        except Exception:
+            pass  # non-critical
+
+        try:
+            fresh_user_response = admin_supabase.auth.admin.get_user_by_id(user.id)
+            if fresh_user_response and fresh_user_response.user:
+                fresh_user = fresh_user_response.user
+                return jsonify({
+                    "user": {
+                        "id": fresh_user.id,
+                        "email": fresh_user.email,
+                        "name": fresh_user.user_metadata.get("full_name", ""),
+                        "createdAt": fresh_user.created_at
+                    },
+                    "token": session.access_token
+                }), 200
+            else:
+                return jsonify({
+                    "user": {
+                        "id": user.id,
+                        "email": user.email,
+                        "name": user.user_metadata.get("full_name", ""),
+                        "createdAt": user.created_at
+                    },
+                    "token": session.access_token
+                }), 200
+        except Exception:
+            # Fallback to token user data
+            return jsonify({
+                "user": {
+                    "id": user.id,
+                    "email": user.email,
+                    "name": user.user_metadata.get("full_name", ""),
+                    "createdAt": user.created_at
+                },
+                "token": session.access_token
+            }), 200
 
     except Exception as e:
         error_message = str(e)
-        print(f"Login error: {error_message}")
-        print(f"Error type: {type(e).__name__}")
-        
+
         if "Invalid login credentials" in error_message:
             return jsonify({"error": "Invalid email or password"}), 401
 
+        print(f"[ERROR] Login error: {error_message}")
         return jsonify({"error": error_message}), 500
 
 
@@ -272,35 +628,42 @@ def logout():
 
 @app.route("/api/auth/me", methods=["GET"])
 def get_current_user():
-    """Get current user info with latest metadata"""
+    """Get current user info with latest metadata (reads name from user_settings for RLS safety)"""
     user = get_user_from_token()
     if not user:
         return jsonify({"error": "Unauthorized"}), 401
-    
+
     try:
-        # Fetch latest user data from Supabase to get updated metadata
-        fresh_user = supabase.auth.admin.get_user_by_id(user.id)
-        if fresh_user and fresh_user.user:
-            return jsonify({
-                "user": {
-                    "id": fresh_user.user.id,
-                    "email": fresh_user.user.email,
-                    "name": fresh_user.user.user_metadata.get("full_name", ""),
-                    "createdAt": fresh_user.user.created_at
-                }
-            }), 200
-        else:
-            # Fallback to token user
-            return jsonify({
-                "user": {
-                    "id": user.id,
-                    "email": user.email,
-                    "name": user.user_metadata.get("full_name", ""),
-                    "createdAt": user.created_at
-                }
-            }), 200
+        # Try to read name from user_settings first (RLS safe)
+        user_settings_result = supabase.table('user_settings').select('profile').eq('user_id', user.id).execute()
+        name_from_settings = ""
+        if user_settings_result.data and 'profile' in user_settings_result.data[0]:
+            # If `name` exists in profile, prefer it
+            name_from_settings = user_settings_result.data[0]['profile'].get("name", "")
+
+        # Fallback: try admin API to get Auth metadata (may fail if RLS/service_role not allowed, so non-fatal)
+        name_from_auth = ""
+        try:
+            fresh_user_response = admin_supabase.auth.admin.get_user_by_id(user.id)
+            if fresh_user_response and fresh_user_response.user:
+                name_from_auth = fresh_user_response.user.user_metadata.get("full_name", "")
+        except Exception:
+            pass  # non-critical
+
+        # Choose name: prefer user_settings (so it's always available), fallback to Auth, fallback to empty
+        final_name = name_from_settings or name_from_auth or user.user_metadata.get("full_name", "")
+
+        return jsonify({
+            "user": {
+                "id": user.id,
+                "email": user.email,
+                "name": final_name,
+                "createdAt": user.created_at
+            }
+        }), 200
+
     except Exception as e:
-        print(f"Error fetching user: {e}")
+        print(f"[ERROR] /api/auth/me failed: {e}")
         # Fallback to token user
         return jsonify({
             "user": {
@@ -370,38 +733,23 @@ def update_user_profile():
     user = get_user_from_token()
     if not user:
         return jsonify({"error": "Unauthorized"}), 401
-    
+
     try:
         data = request.get_json()
         if not data:
             return jsonify({"error": "Missing JSON data"}), 400
-        
-        print(f"Updating profile for user {user.id}")
-        print(f"Data received: {data}")
-        
-        # Update auth metadata if name changed
-        if "name" in data:
-            try:
-                print(f"Updating user name to: {data['name']}")
-                supabase.auth.admin.update_user_by_id(
-                    user.id,
-                    {"user_metadata": {"full_name": data["name"]}}
-                )
-                print("Name updated successfully in auth")
-            except Exception as e:
-                print(f"Error updating auth metadata: {e}")
-        
+
         # Get current settings
         result = supabase.table('user_settings').select('*').eq('user_id', user.id).execute()
-        
+
+        # Prepare profile data for user_settings table
         profile_data = {
+            "name": data.get("name", ""),  # Store name in user_settings
             "bio": data.get("bio", ""),
             "website": data.get("website", ""),
             "location": data.get("location", "")
         }
-        
-        print(f"Updating profile data: {profile_data}")
-        
+
         if result.data and len(result.data) > 0:
             # Update existing
             supabase.table('user_settings').update({"profile": profile_data}).eq('user_id', user.id).execute()
@@ -409,16 +757,43 @@ def update_user_profile():
             # Create new
             supabase.table('user_settings').insert({
                 "user_id": user.id,
-                "profile": profile_data
+                "profile": profile_data,
+                "preferences": {
+                    "emailNotifications": True,
+                    "browserNotifications": False,
+                    "galleryUpdates": True,
+                    "marketingEmails": False,
+                    "defaultGalleryVisibility": "private",
+                    "autoSave": True,
+                    "compressImages": True,
+                    "defaultThreshold": 80,
+                    "language": "en"
+                }
             }).execute()
-        
-        print("Profile updated successfully")
-        return jsonify({"message": "Profile updated successfully", "profile": profile_data}), 200
-    
-    except Exception as e:
-        print(f"Error updating profile: {e}")
-        return jsonify({"error": str(e)}), 500
 
+        # ALSO TRY to update auth metadata (best effort - won't fail if it doesn't work, and runs AFTER user_settings updates)
+        if "name" in data and data["name"]:
+            try:
+                admin_supabase.auth.admin.update_user_by_id(
+                    uid=user.id,
+                    attributes={"user_metadata": {"full_name": data["name"]}}
+                )
+            except Exception:
+                pass  # non-critical
+
+        # Return the updated name in the response
+        response_data = {
+            "message": "Profile updated successfully",
+            "profile": profile_data
+        }
+        if "name" in data:
+            response_data["name"] = data["name"]
+
+        return jsonify(response_data), 200
+
+    except Exception as e:
+        print(f"[ERROR] /api/user/profile failed: {e}")
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/api/user/preferences", methods=["PUT"])
 def update_user_preferences():
@@ -484,7 +859,7 @@ def change_password():
         
         # Update password
         try:
-            supabase.auth.admin.update_user_by_id(
+            admin_supabase.auth.admin.update_user_by_id(
                 user.id,
                 {"password": new_password}
             )
@@ -508,6 +883,7 @@ def export_user_data():
     try:
         # Fetch all user galleries
         result = supabase.table('galleries').select('*').eq('user_id', user.id).execute()
+        
         galleries = result.data if result.data else []
         
         # Fetch images for each gallery
@@ -573,7 +949,7 @@ def delete_user_account():
         
         # Delete user from auth
         try:
-            supabase.auth.admin.delete_user(user.id)
+            admin_supabase.auth.admin.delete_user(user.id)
         except Exception as e:
             print(f"Error deleting user from auth: {e}")
         
@@ -599,6 +975,11 @@ def list_galleries():
         
         galleries = result.data if result.data else []
         
+        # Update image_count for each gallery
+        for gallery in galleries:
+            images_result = supabase.table('images').select('id').eq('gallery_id', gallery['id']).execute()
+            gallery['image_count'] = len(images_result.data) if images_result.data else 0
+        
         return jsonify(galleries), 200
     
     except Exception as e:
@@ -608,12 +989,20 @@ def list_galleries():
 
 @app.route("/api/galleries", methods=["POST"])
 def create_gallery():
-    """Create a new gallery"""
+    """Create a new gallery - ONE GALLERY PER USER CONSTRAINT"""
     user = get_user_from_token()
     if not user:
         return jsonify({"error": "Unauthorized"}), 401
     
     try:
+        # CHECK: Enforce one gallery per user constraint
+        existing_galleries = supabase.table('galleries').select('id').eq('user_id', user.id).execute()
+        if existing_galleries.data and len(existing_galleries.data) > 0:
+            return jsonify({
+                "error": "You already have a portfolio. Only one portfolio is allowed per account.",
+                "existingGalleryId": existing_galleries.data[0]['id']
+            }), 400
+        
         data = request.get_json()
         if not data:
             return jsonify({"error": "Missing JSON data"}), 400
@@ -677,6 +1066,9 @@ def get_gallery(gallery_id):
         
         gallery['images'] = images_result.data if images_result.data else []
         
+        # Update image_count to match actual count
+        gallery['image_count'] = len(gallery['images'])
+        
         return jsonify(gallery), 200
     
     except Exception as e:
@@ -690,43 +1082,47 @@ def update_gallery(gallery_id):
     user = get_user_from_token()
     if not user:
         return jsonify({"error": "Unauthorized"}), 401
-    
+
     try:
         data = request.get_json()
         if not data:
             return jsonify({"error": "Missing JSON data"}), 400
-        
+
         # Verify ownership
         gallery_result = supabase.table('galleries').select('*').eq('id', gallery_id).eq('user_id', user.id).execute()
-        
         if not gallery_result.data:
             return jsonify({"error": "Gallery not found"}), 404
-        
+
+        current_gallery = gallery_result.data[0]
+        current_config = current_gallery.get('config', {})
+
         # Prepare update data
         update_data = {}
-        
+
         if "name" in data:
             update_data["name"] = data["name"]
             # Regenerate slug if name changed
             update_data["slug"] = generate_slug(data["name"], user.id)
-        
+
         if "description" in data:
             update_data["description"] = data["description"]
-        
+
         if "config" in data:
-            update_data["config"] = data["config"]
-        
+            # MERGE configs instead of replacing
+            new_config = data["config"]
+            merged_config = {**current_config, **new_config}
+            update_data["config"] = merged_config
+
         if "status" in data:
             update_data["status"] = data["status"]
-        
+
         # Update gallery
         result = supabase.table('galleries').update(update_data).eq('id', gallery_id).execute()
-        
         if result.data:
             return jsonify(result.data[0]), 200
         else:
             return jsonify({"error": "Failed to update gallery"}), 500
-    
+
     except Exception as e:
         print(f"Error updating gallery: {e}")
         return jsonify({"error": str(e)}), 500
@@ -871,9 +1267,14 @@ def upload_images(gallery_id):
                     print(f"Error uploading image: {e}")
                     continue
         
-        # Update gallery status
+        # Update gallery image_count and status
+        new_image_count = gallery['image_count'] + len(uploaded_images)
+        update_data = {"image_count": new_image_count}
+        
         if uploaded_images and gallery['status'] == 'draft':
-            supabase.table('galleries').update({"status": "processing"}).eq('id', gallery_id).execute()
+            update_data["status"] = "processing"
+        
+        supabase.table('galleries').update(update_data).eq('id', gallery_id).execute()
         
         return jsonify({
             "uploadedCount": len(uploaded_images),
@@ -924,6 +1325,119 @@ def analyze_gallery(gallery_id):
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/images/<image_id>/transform", methods=["PATCH"])
+def update_image_transform(image_id):
+    """Update image transformation metadata (crop, scale, rotation)"""
+    user = get_user_from_token()
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON data"}), 400
+
+        # First, get the image
+        image_result = supabase.table('images').select('*').eq('id', image_id).execute()
+        if not image_result.data:
+            return jsonify({"error": "Image not found"}), 404
+
+        current_image = image_result.data[0]
+        gallery_id = current_image.get('gallery_id')
+
+        # Now check gallery ownership
+        gallery_result = supabase.table('galleries').select('user_id').eq('id', gallery_id).execute()
+        if not gallery_result.data:
+            return jsonify({"error": "Gallery not found"}), 404
+
+        gallery_owner_id = gallery_result.data[0]['user_id']
+        if gallery_owner_id != user.id:
+            return jsonify({"error": "Unauthorized"}), 403
+
+        # Get current metadata
+        current_metadata = current_image.get('metadata', {})
+
+        # Update transformation data
+        transform_data = {
+            'crop': data.get('crop'),  # {x, y, width, height, unit: 'px' or '%'}
+            'scale': data.get('scale', 1.0),  # Scale factor (0.5 to 3.0)
+            'rotation': data.get('rotation', 0)  # Degrees (0-360)
+        }
+
+        # Merge with existing metadata
+        updated_metadata = {**current_metadata, 'transform': transform_data}
+
+        # Update in database
+        result = supabase.table('images').update({
+            'metadata': updated_metadata
+        }).eq('id', image_id).execute()
+
+        if result.data:
+            return jsonify({
+                "success": True,
+                "image": result.data[0]
+            }), 200
+        else:
+            return jsonify({"error": "Failed to update image"}), 500
+
+    except Exception as e:
+        print(f"Error updating image transform: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/api/galleries/<gallery_id>/branding", methods=["PATCH"])
+def update_gallery_branding(gallery_id):
+    """Update gallery branding (custom name, email, social links)"""
+    user = get_user_from_token()
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+
+    try:
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON data"}), 400
+
+        # Verify ownership
+        gallery_result = supabase.table('galleries').select('*').eq('id', gallery_id).eq('user_id', user.id).execute()
+
+        if not gallery_result.data:
+            return jsonify({"error": "Gallery not found"}), 404
+
+        # Get current config
+        current_gallery = gallery_result.data[0]
+        current_config = current_gallery.get('config', {})
+        current_branding = current_config.get('branding', {})
+
+        # Update branding data - merge with existing
+        updated_branding = {**current_branding}
+        if 'customName' in data:
+            updated_branding['customName'] = data['customName']
+        if 'customNameLink' in data:
+            updated_branding['customNameLink'] = data['customNameLink']
+        if 'customEmail' in data:
+            updated_branding['customEmail'] = data['customEmail']
+
+        # Merge branding into config, preserving all other fields
+        updated_config = {**current_config, 'branding': updated_branding}
+
+        # Update in database
+        result = supabase.table('galleries').update({
+            'config': updated_config
+        }).eq('id', gallery_id).execute()
+
+        if result.data:
+            return jsonify({
+                "success": True,
+                "gallery": result.data[0]
+            }), 200
+        else:
+            return jsonify({"error": "Failed to update gallery branding"}), 500
+
+    except Exception as e:
+        print(f"[ERROR] /api/galleries/<gallery_id>/branding failed: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 # ==================== Public Routes ====================
 
 @app.route("/api/public/<username>/<slug>", methods=["GET"])
@@ -942,7 +1456,7 @@ def get_public_gallery(username, slug):
         gallery = gallery_result.data[0]
         
         # Get user info
-        user_result = supabase.auth.admin.get_user_by_id(gallery['user_id'])
+        user_result = admin_supabase.auth.admin.get_user_by_id(gallery['user_id'])
         
         owner_info = {
             "username": user_result.user.email.split('@')[0] if user_result.user else "user",
@@ -986,7 +1500,7 @@ def get_public_gallery_by_id(gallery_id):
         
         # Get user info
         try:
-            user_result = supabase.auth.admin.get_user_by_id(gallery['user_id'])
+            user_result = admin_supabase.auth.admin.get_user_by_id(gallery['user_id'])
             gallery['owner'] = {
                 "username": user_result.user.email.split('@')[0] if user_result.user else "user",
                 "name": user_result.user.user_metadata.get("full_name", "") if user_result.user else ""

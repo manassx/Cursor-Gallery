@@ -19,10 +19,10 @@ const Settings = () => {
     // Tab state
     const [activeTab, setActiveTab] = useState('profile');
 
-    // Profile settings
+    // Profile settings - Initialize with empty, will sync with user via useEffect
     const [profile, setProfile] = useState({
-        name: user?.name || '',
-        email: user?.email || '',
+        name: '',
+        email: '',
         bio: '',
         website: '',
         location: ''
@@ -58,7 +58,7 @@ const Settings = () => {
     const [deleteConfirmText, setDeleteConfirmText] = useState('');
     const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
-    // Fetch user settings on mount
+    // Fetch fresh user settings and metadata on mount
     useEffect(() => {
         fetchUserSettings();
     }, []);
@@ -66,21 +66,26 @@ const Settings = () => {
     const fetchUserSettings = async () => {
         setIsLoading(true);
         try {
-            const data = await api.get('/api/user/settings');
-            console.log('Fetched settings:', data);
-            if (data) {
-                if (data.profile) {
+            // Fetch both settings and fresh user metadata from backend
+            const [settingsData, freshUser] = await Promise.all([
+                api.get('/api/user/settings'),
+                api.get('/api/auth/me').then(res => res.user).catch(() => null)
+            ]);
+
+            console.log('Fetched settings:', settingsData);
+            if (settingsData) {
+                if (settingsData.profile) {
                     setProfile(prev => ({
-                        ...prev,
-                        // Don't overwrite name/email - keep from user object
-                        bio: data.profile.bio || '',
-                        website: data.profile.website || '',
-                        location: data.profile.location || ''
+                        name: (freshUser?.name || settingsData.profile.name || ''),
+                        email: (freshUser?.email || settingsData.profile.email || ''),
+                        bio: settingsData.profile.bio || '',
+                        website: settingsData.profile.website || '',
+                        location: settingsData.profile.location || ''
                     }));
                 }
-                if (data.preferences) {
+                if (settingsData.preferences) {
                     // Ensure threshold is a valid value
-                    let threshold = data.preferences.defaultThreshold || 80;
+                    let threshold = settingsData.preferences.defaultThreshold || 80;
                     if (!THRESHOLD_VALUES.includes(threshold)) {
                         // Find closest valid threshold
                         threshold = THRESHOLD_VALUES.reduce((prev, curr) =>
@@ -89,15 +94,15 @@ const Settings = () => {
                     }
                     console.log('Loading threshold from DB:', threshold);
                     setPreferences({
-                        emailNotifications: data.preferences.emailNotifications !== false,
-                        browserNotifications: data.preferences.browserNotifications === true,
-                        galleryUpdates: data.preferences.galleryUpdates !== false,
-                        marketingEmails: data.preferences.marketingEmails === true,
-                        defaultGalleryVisibility: data.preferences.defaultGalleryVisibility || 'private',
-                        autoSave: data.preferences.autoSave !== false,
-                        compressImages: data.preferences.compressImages !== false,
+                        emailNotifications: settingsData.preferences.emailNotifications !== false,
+                        browserNotifications: settingsData.preferences.browserNotifications === true,
+                        galleryUpdates: settingsData.preferences.galleryUpdates !== false,
+                        marketingEmails: settingsData.preferences.marketingEmails === true,
+                        defaultGalleryVisibility: settingsData.preferences.defaultGalleryVisibility || 'private',
+                        autoSave: settingsData.preferences.autoSave !== false,
+                        compressImages: settingsData.preferences.compressImages !== false,
                         defaultThreshold: threshold,
-                        language: data.preferences.language || 'en'
+                        language: settingsData.preferences.language || 'en'
                     });
                 }
             }
@@ -300,7 +305,7 @@ const Settings = () => {
                     initial={{opacity: 0}}
                     animate={{opacity: 1}}
                     transition={{delay: 0.1}}
-                    className="flex gap-2 mb-8 overflow-x-auto pb-2"
+                    className="flex flex-col sm:flex-row gap-2 mb-6 sm:mb-8 overflow-x-auto pb-2 sm:pb-0 settings-tabs"
                 >
                     {tabs.map((tab) => {
                         const Icon = tab.icon;
@@ -309,14 +314,14 @@ const Settings = () => {
                             <button
                                 key={tab.id}
                                 onClick={() => setActiveTab(tab.id)}
-                                className="flex items-center gap-2 px-6 py-3 text-xs tracking-wider border transition-all duration-300 whitespace-nowrap"
+                                className="flex items-center gap-2 px-4 sm:px-6 py-2.5 sm:py-3 text-[10px] sm:text-xs tracking-wider border transition-all duration-300 whitespace-nowrap settings-tab"
                                 style={{
                                     backgroundColor: isActive ? currentTheme.accent : 'transparent',
                                     color: isActive ? (isDark ? '#0a0a0a' : '#f5f3ef') : currentTheme.textDim,
                                     borderColor: isActive ? currentTheme.accent : currentTheme.border
                                 }}
                             >
-                                <Icon size={14}/>
+                                <Icon size={window.innerWidth < 640 ? 12 : 14}/>
                                 {tab.label}
                             </button>
                         );

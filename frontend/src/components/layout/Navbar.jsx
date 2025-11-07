@@ -38,7 +38,7 @@ const Navbar = () => {
                 }}
             >
                 {/* Logo */}
-                <Link to={isDashboard ? "/dashboard" : "/"} className="flex items-center gap-2 md:gap-3">
+                <Link to="/" className="flex items-center gap-2 md:gap-3">
                     <div className="w-1.5 h-1.5 rounded-full transition-colors duration-300"
                          style={{backgroundColor: currentTheme.text}}></div>
                     <span
@@ -77,22 +77,6 @@ const Navbar = () => {
                             >
                                 {isDark ? <Sun className="w-4 h-4"/> : <Moon className="w-4 h-4"/>}
                             </button>
-
-                            {/* Only show Create button if NOT on dashboard */}
-                            {!isDashboard && (
-                                <Link
-                                    to="/create"
-                                    className="px-4 lg:px-6 py-2 text-xs tracking-[0.2em] font-medium transition-all duration-300"
-                                    style={{
-                                        backgroundColor: currentTheme.accent,
-                                        color: isDark ? '#0a0a0a' : '#f5f3ef'
-                                    }}
-                                    onMouseEnter={(e) => e.target.style.backgroundColor = currentTheme.accentHover}
-                                    onMouseLeave={(e) => e.target.style.backgroundColor = currentTheme.accent}
-                                >
-                                    CREATE
-                                </Link>
-                            )}
 
                             {/* User menu */}
                             <div className="relative group">
@@ -243,19 +227,6 @@ const Navbar = () => {
                                         onClick={() => setMobileMenuOpen(false)}
                                     >
                                         DASHBOARD
-                                    </Link>
-                                )}
-                                {!isDashboard && (
-                                    <Link
-                                        to="/create"
-                                        className="px-4 py-3 text-xs tracking-[0.2em] font-medium transition-all duration-300 text-center"
-                                        style={{
-                                            backgroundColor: currentTheme.accent,
-                                            color: isDark ? '#0a0a0a' : '#f5f3ef'
-                                        }}
-                                        onClick={() => setMobileMenuOpen(false)}
-                                    >
-                                        CREATE
                                     </Link>
                                 )}
                                 <Link

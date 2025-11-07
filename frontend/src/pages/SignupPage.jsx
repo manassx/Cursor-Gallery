@@ -170,12 +170,19 @@ const SignupPage = () => {
                 return;
             }
 
-            const redirectTo = `${window.location.origin}/auth/callback`;
+            // CRITICAL FIX: Use current host (works for both localhost and network IPs)
+            const currentOrigin = window.location.origin;
+            const redirectTo = `${currentOrigin}/auth/callback`;
 
-            // Construct proper Supabase OAuth URL
-            const authUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectTo)}`;
+            // CRITICAL FIX: Add prompt=select_account to force Google account selector
+            // This ensures users can choose which account to use every time
+            const authUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectTo)}&prompt=select_account`;
 
-            console.log('Redirecting to Google OAuth:', authUrl);
+            console.log('=== GOOGLE SIGN UP ===');
+            console.log('Current origin:', currentOrigin);
+            console.log('Redirect URL:', redirectTo);
+            console.log('Auth URL:', authUrl);
+            console.log('======================');
 
             // Redirect to Supabase Google OAuth
             window.location.href = authUrl;

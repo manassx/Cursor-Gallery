@@ -147,12 +147,19 @@ const LoginPage = () => {
                 return;
             }
 
-            const redirectTo = `${window.location.origin}/auth/callback`;
+            // CRITICAL FIX: Use current host (works for both localhost and network IPs)
+            const currentOrigin = window.location.origin;
+            const redirectTo = `${currentOrigin}/auth/callback`;
 
-            // Construct proper Supabase OAuth URL
-            const authUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectTo)}`;
+            // CRITICAL FIX: Add prompt=select_account to force Google account selector
+            // This ensures users can choose which account to use every time
+            const authUrl = `${SUPABASE_URL}/auth/v1/authorize?provider=google&redirect_to=${encodeURIComponent(redirectTo)}&prompt=select_account`;
 
-            console.log('Redirecting to Google OAuth:', authUrl);
+            console.log('=== GOOGLE SIGN IN ===');
+            console.log('Current origin:', currentOrigin);
+            console.log('Redirect URL:', redirectTo);
+            console.log('Auth URL:', authUrl);
+            console.log('======================');
 
             // Redirect to Supabase Google OAuth
             window.location.href = authUrl;
@@ -165,7 +172,7 @@ const LoginPage = () => {
 
     return (
         <div
-            className="h-screen flex items-center justify-center px-4 py-8 md:py-0 relative overflow-hidden transition-colors duration-500"
+            className="min-h-screen flex items-center justify-center px-4 py-4 md:py-8 relative overflow-hidden transition-colors duration-500"
             style={{backgroundColor: currentTheme.bg}}
         >
             {/* Animated noise scanline overlay */}
@@ -218,7 +225,7 @@ const LoginPage = () => {
             <div className="w-full max-w-[90%] sm:max-w-md relative z-10">
                 {/* Header */}
                 <motion.div
-                    className="text-center mb-4 md:mb-6"
+                    className="text-center mb-0 md:mb-6 mt-6"
                     initial={{opacity: 0, y: -20}}
                     animate={{opacity: 1, y: 0}}
                     transition={{duration: 0.6}}
@@ -254,7 +261,7 @@ const LoginPage = () => {
                     transition={{duration: 0.5, ease: 'easeOut'}}
                     onMouseMove={handleCardMouseMove}
                     onMouseLeave={handleCardMouseLeave}
-                    className="px-6 py-8 md:px-8 md:py-10 shadow-2xl rounded-xl border transition-all duration-100"
+                    className="px-6 py-8 md:px-8 md:py-10 shadow-2xl rounded-xl border transition-all duration-100 mt-6"
                     style={{
                         backgroundColor: currentTheme.bgAlt,
                         borderColor: currentTheme.border,

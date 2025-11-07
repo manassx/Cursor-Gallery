@@ -109,16 +109,485 @@
     }
 }
 
-/* Mobile view message */
-@media (max-width: 1024px) {
-    .mobile-message {
-        display: flex !important;
-    }
-}
-
-/* Typography refinements */
 @layer utilities {
     .text-balance {
         text-wrap: balance;
     }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+
+::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+    background: rgba(168, 156, 142, 0.3);
+    border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+    background: rgba(168, 156, 142, 0.5);
+}
+
+/* Font Smoothing */
+* {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+/* Custom Fonts */
+@font-face {
+    font-family: 'Arial Black';
+    src: local('Arial Black'), local('Arial-Black');
+    font-weight: 900;
+}
+
+/* Body Styles */
+body {
+    margin: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+code {
+    font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
+    monospace;
+}
+
+/* Remove default button styles */
+button {
+    -webkit-tap-highlight-color: transparent;
+}
+
+/* Prevent text selection on UI elements */
+button, a {
+    -webkit-user-select: none;
+    -moz-user-select: none;
+    -ms-user-select: none;
+    user-select: none;
+}
+
+/* Remove default link underline */
+a {
+    text-decoration: none;
+}
+
+/* Custom animations */
+@keyframes fadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(10px);
+    }
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes slideInFromRight {
+    from {
+        transform: translateX(100%);
+    }
+    to {
+        transform: translateX(0);
+    }
+}
+
+/* ========================================
+   MOBILE RESPONSIVE UTILITIES
+   ======================================== */
+
+/* Touch-friendly tap targets - at least 44x44px */
+@media (max-width: 768px) {
+    button, a[role="button"], input[type="button"], input[type="submit"] {
+        min-height: 44px;
+        min-width: 44px;
+    }
+
+    /* Prevent zoom on input focus on iOS */
+    input, select, textarea {
+        font-size: 16px !important;
+    }
+
+    /* Better mobile padding */
+    .mobile-padding {
+        padding-left: 0.75rem;
+        padding-right: 0.75rem;
+    }
+
+    /* Mobile-friendly modal */
+    .mobile-modal {
+        max-height: 90vh;
+        overflow-y: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+
+    /* Touch-optimized cards */
+    .mobile-card {
+        padding: 1rem;
+        margin-bottom: 0.75rem;
+    }
+
+    /* Mobile menu animations */
+    .mobile-menu-enter {
+        animation: slideInFromRight 0.3s ease-out;
+    }
+}
+
+/* Small mobile devices (< 375px) */
+@media (max-width: 374px) {
+    html {
+        font-size: 14px;
+    }
+
+    .xs-text-sm {
+        font-size: 0.75rem;
+    }
+
+    .xs-text-xs {
+        font-size: 0.625rem;
+    }
+}
+
+/* Tablet and larger */
+@media (min-width: 769px) {
+    /* Enable hover effects only on desktop */
+    .hover-effect:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+    }
+}
+
+/* ========================================
+   MODAL & OVERLAY RESPONSIVE STYLES
+   ======================================== */
+
+/* Mobile-optimized modals */
+@media (max-width: 768px) {
+    .modal-content {
+        width: calc(100% - 1.5rem);
+        max-height: 90vh;
+        overflow-y: auto;
+        margin: 0.75rem;
+        border-radius: 0.5rem;
+    }
+
+    .modal-header {
+        position: sticky;
+        top: 0;
+        background: inherit;
+        z-index: 10;
+        padding: 0.75rem 1rem;
+        border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    }
+
+    .modal-body {
+        padding: 1rem;
+    }
+
+    .modal-footer {
+        position: sticky;
+        bottom: 0;
+        background: inherit;
+        padding: 0.75rem 1rem;
+        border-top: 1px solid rgba(0, 0, 0, 0.1);
+    }
+}
+
+/* ========================================
+   FORM RESPONSIVE STYLES
+   ======================================== */
+
+@media (max-width: 768px) {
+    /* Stack form elements vertically on mobile */
+    .form-row {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+
+    .form-input {
+        width: 100% !important;
+        font-size: 16px; /* Prevent zoom on iOS */
+    }
+
+    .form-label {
+        font-size: 0.75rem;
+        margin-bottom: 0.375rem;
+    }
+
+    .form-button {
+        width: 100%;
+        padding: 0.75rem 1rem;
+    }
+}
+
+/* ========================================
+   GRID & LAYOUT RESPONSIVE STYLES
+   ======================================== */
+
+@media (max-width: 768px) {
+    /* Single column on mobile */
+    .responsive-grid {
+        grid-template-columns: 1fr !important;
+        gap: 0.75rem;
+    }
+
+    /* Reduce padding on mobile */
+    .responsive-padding {
+        padding: 0.75rem;
+    }
+
+    /* Stack flex items */
+    .responsive-flex {
+        flex-direction: column;
+        gap: 0.75rem;
+    }
+}
+
+/* ========================================
+   CROP MODAL RESPONSIVE FIXES
+   ======================================== */
+
+@media (max-width: 768px) {
+    /* Make crop handles larger and easier to tap */
+    .crop-handle {
+        width: 24px !important;
+        height: 24px !important;
+        touch-action: none;
+    }
+
+    /* Optimize crop container for mobile */
+    .crop-container {
+        max-height: 40vh;
+        touch-action: none;
+    }
+
+    .crop-image {
+        max-height: 40vh;
+        width: auto;
+        object-fit: contain;
+    }
+}
+
+/* ========================================
+   SETTINGS PAGE RESPONSIVE FIXES
+   ======================================== */
+
+@media (max-width: 768px) {
+    /* Stack tabs vertically on mobile */
+    .settings-tabs {
+        flex-direction: column;
+        gap: 0.5rem;
+        overflow-x: visible;
+        padding-bottom: 0;
+    }
+
+    .settings-tab {
+        width: 100%;
+        justify-content: flex-start;
+        padding: 0.75rem 1rem;
+    }
+
+    /* Optimize settings forms */
+    .settings-form-group {
+        margin-bottom: 1rem;
+    }
+
+    .settings-input {
+        font-size: 16px; /* Prevent zoom */
+        padding: 0.75rem;
+    }
+
+    /* Toggle switches - make touch-friendly */
+    .toggle-switch {
+        min-width: 48px;
+        min-height: 28px;
+    }
+}
+
+/* ========================================
+   GALLERY EDITOR RESPONSIVE FIXES
+   ======================================== */
+
+@media (max-width: 768px) {
+    /* Fixed edit panel positioning */
+    .edit-panel {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        top: auto;
+        transform: none !important;
+        max-height: 50vh;
+        overflow-y: auto;
+        border-radius: 1rem 1rem 0 0;
+        box-shadow: 0 -4px 20px rgba(0, 0, 0, 0.3);
+    }
+
+    /* Gallery canvas optimization */
+    .gallery-canvas {
+        height: 50vh !important;
+        min-height: 300px !important;
+    }
+
+    /* Threshold controls */
+    .threshold-control {
+        padding: 0.5rem 0.75rem;
+        font-size: 0.875rem;
+    }
+}
+
+/* ========================================
+   DASHBOARD RESPONSIVE FIXES
+   ======================================== */
+
+@media (max-width: 768px) {
+    /* Portfolio cards stack */
+    .portfolio-grid {
+        grid-template-columns: 1fr !important;
+    }
+
+    .portfolio-card {
+        padding: 1rem;
+    }
+
+    .portfolio-actions {
+        flex-wrap: wrap;
+        gap: 0.5rem;
+    }
+
+    .portfolio-action-btn {
+        flex: 1;
+        min-width: calc(50% - 0.25rem);
+        padding: 0.625rem 0.75rem;
+        font-size: 0.75rem;
+    }
+}
+
+/* ========================================
+   UPLOAD ZONE RESPONSIVE FIXES
+   ======================================== */
+
+@media (max-width: 768px) {
+    .upload-zone {
+        min-height: 200px;
+        padding: 1.5rem 1rem;
+    }
+
+    .upload-zone-text {
+        font-size: 0.875rem;
+    }
+
+    .upload-zone-icon {
+        width: 40px !important;
+        height: 40px !important;
+    }
+
+    /* Preview images grid */
+    .preview-grid {
+        grid-template-columns: repeat(auto-fill, minmax(80px, 1fr)) !important;
+        gap: 0.5rem;
+    }
+}
+
+/* ========================================
+   NAVBAR RESPONSIVE FIXES
+   ======================================== */
+
+@media (max-width: 768px) {
+    .navbar {
+        padding: 0.5rem 0.75rem;
+    }
+
+    .navbar-brand {
+        font-size: 0.625rem;
+        letter-spacing: 0.1em;
+    }
+
+    .navbar-menu {
+        padding: 0.75rem;
+    }
+
+    .navbar-menu-item {
+        padding: 0.75rem 0.5rem;
+        font-size: 0.75rem;
+    }
+}
+
+/* ========================================
+   UTILITY CLASSES
+   ======================================== */
+
+/* Hide on mobile */
+@media (max-width: 768px) {
+    .hide-mobile {
+        display: none !important;
+    }
+}
+
+/* Show only on mobile */
+.show-mobile {
+    display: none !important;
+}
+
+@media (max-width: 768px) {
+    .show-mobile {
+        display: block !important;
+    }
+
+    .show-mobile-flex {
+        display: flex !important;
+    }
+
+    .show-mobile-grid {
+        display: grid !important;
+    }
+}
+
+/* Safe area insets for notched devices */
+@supports (padding: max(0px)) {
+    .safe-top {
+        padding-top: max(0.75rem, env(safe-area-inset-top));
+    }
+
+    .safe-bottom {
+        padding-bottom: max(0.75rem, env(safe-area-inset-bottom));
+    }
+
+    .safe-left {
+        padding-left: max(0.75rem, env(safe-area-inset-left));
+    }
+
+    .safe-right {
+        padding-right: max(0.75rem, env(safe-area-inset-right));
+    }
+}
+
+/* ========================================
+   ANIMATION PERFORMANCE
+   ======================================== */
+
+/* Optimize animations for mobile */
+@media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+}
+
+/* GPU acceleration for smooth animations */
+.gpu-accelerated {
+    transform: translateZ(0);
+    will-change: transform;
 }

@@ -102,7 +102,7 @@ const useAuthStore = create(
 
             /**
              * ### UPDATE USER ACTION ###
-             * Updates the user data in the store
+             * Updates the user data in the store - persist middleware handles localStorage
              */
             updateUser: (userData) => {
                 const currentUser = get().user;
@@ -114,14 +114,7 @@ const useAuthStore = create(
                 set({
                     user: updatedUser
                 });
-                // Force persist
-                localStorage.setItem('auth-storage', JSON.stringify({
-                    state: {
-                        user: updatedUser,
-                        token: get().token,
-                        isAuthenticated: get().isAuthenticated
-                    }
-                }));
+                // Persist middleware will automatically save to localStorage
             },
 
             /**

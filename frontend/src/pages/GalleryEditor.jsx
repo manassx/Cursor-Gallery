@@ -25,6 +25,19 @@ const GalleryEditor = () => {
 
             // Fetch gallery from backend
             const galleryData = await apiGet(`/api/galleries/${id}`);
+            console.log('===== GALLERY EDITOR: Loaded gallery data =====');
+            console.log('Gallery:', galleryData);
+            console.log('Gallery images:', galleryData.images);
+
+            // Log each image's metadata
+            galleryData.images.forEach((img, idx) => {
+                console.log(`Image ${idx}:`, {
+                    id: img.id,
+                    url: img.url,
+                    metadata: img.metadata,
+                    hasTransform: !!(img.metadata && img.metadata.transform)
+                });
+            });
 
             // Transform images to the format expected by CursorTrailGallery
             const formattedGallery = {
@@ -37,6 +50,7 @@ const GalleryEditor = () => {
                     url: img.url,
                     thumbnail: img.thumbnail_url || img.url,
                     title: `Photo ${index + 1}`,
+                    metadata: img.metadata  // MAKE SURE TO INCLUDE METADATA
                 })),
                 config: galleryData.config || {
                     threshold: 80,
@@ -45,24 +59,26 @@ const GalleryEditor = () => {
                 },
             };
 
+            console.log('Formatted gallery:', formattedGallery);
+            console.log('Formatted images with metadata:', formattedGallery.images);
             setGallery(formattedGallery);
             setLoading(false);
         } catch (err) {
             console.error('Error loading gallery:', err);
-            setError(err.message || 'Failed to load gallery');
+            setError(err.message || 'Failed to load portfolio');
             setLoading(false);
-            toast.error('Failed to load gallery');
+            toast.error('Failed to load portfolio');
         }
     };
 
     const handlePublish = async () => {
         try {
             await patch(`/api/galleries/${id}`, {status: 'published'});
-            toast.success('Gallery published!');
+            toast.success('Portfolio published!');
             setGallery(prev => ({...prev, status: 'published'}));
         } catch (err) {
             console.error('Error publishing gallery:', err);
-            toast.error('Failed to publish gallery');
+            toast.error('Failed to publish portfolio');
         }
     };
 
@@ -79,7 +95,7 @@ const GalleryEditor = () => {
             }}>
                 <div className="text-center">
                     <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-current mx-auto mb-4"></div>
-                    <p>Loading gallery...</p>
+                    <p>Loading your portfolio...</p>
                 </div>
             </div>
         );
@@ -97,7 +113,7 @@ const GalleryEditor = () => {
                 fontFamily: '"Inter", sans-serif'
             }}>
                 <div className="text-center">
-                    <p className="text-xl mb-4">😕 Failed to load gallery</p>
+                    <p className="text-xl mb-4">😕 Failed to load portfolio</p>
                     <p className="text-sm opacity-70 mb-6">{error}</p>
                     <button
                         onClick={() => navigate('/dashboard')}
@@ -126,8 +142,8 @@ const GalleryEditor = () => {
                 fontFamily: '"Inter", sans-serif'
             }}>
                 <div className="text-center">
-                    <p className="text-xl mb-4">📷 No images in this gallery yet</p>
-                    <p className="text-sm opacity-70 mb-6">Upload some images to get started</p>
+                    <p className="text-xl mb-4">📷 No images in your portfolio yet</p>
+                    <p className="text-sm opacity-70 mb-6">Add some images to get started</p>
                     <button
                         onClick={() => navigate('/dashboard')}
                         className="px-6 py-2 rounded-lg font-medium"
@@ -178,7 +194,7 @@ const GalleryEditor = () => {
 
             {/* Gallery Info */}
             <div className="fixed top-4 right-4 md:top-6 md:right-6 z-50 flex gap-2">
-                <div className="px-4 py-2 rounded-lg opacity-90" style={{
+                <div className="px-4 py-2 rounded-lg" style={{
                     backgroundColor: currentTheme.bgAlt,
                     border: `1px solid ${currentTheme.border}`
                 }}>
@@ -191,16 +207,16 @@ const GalleryEditor = () => {
                         onClick={handlePublish}
                         className="px-4 py-2 rounded-lg font-bold text-xs transition-all duration-300"
                         style={{
-                            backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+                            backgroundColor: currentTheme.bgAlt,
                             color: currentTheme.text,
                             border: `1px solid ${currentTheme.border}`
                         }}
                         onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.08)';
+                            e.currentTarget.style.backgroundColor = currentTheme.bg;
                             e.currentTarget.style.borderColor = currentTheme.accent;
                         }}
                         onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
+                            e.currentTarget.style.backgroundColor = currentTheme.bgAlt;
                             e.currentTarget.style.borderColor = currentTheme.border;
                         }}
                     >
@@ -213,16 +229,16 @@ const GalleryEditor = () => {
                         onClick={() => window.open(`/gallery/${id}`, '_blank')}
                         className="px-4 py-2 rounded-lg font-bold text-xs flex items-center gap-1 transition-all duration-300"
                         style={{
-                            backgroundColor: isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)',
+                            backgroundColor: currentTheme.bgAlt,
                             color: currentTheme.text,
                             border: `1px solid ${currentTheme.border}`
                         }}
                         onMouseEnter={(e) => {
-                            e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.08)';
+                            e.currentTarget.style.backgroundColor = currentTheme.bg;
                             e.currentTarget.style.borderColor = currentTheme.accent;
                         }}
                         onMouseLeave={(e) => {
-                            e.currentTarget.style.backgroundColor = isDark ? 'rgba(255, 255, 255, 0.1)' : 'rgba(0, 0, 0, 0.05)';
+                            e.currentTarget.style.backgroundColor = currentTheme.bgAlt;
                             e.currentTarget.style.borderColor = currentTheme.border;
                         }}
                     >
@@ -236,8 +252,15 @@ const GalleryEditor = () => {
                 images={gallery.images}
                 threshold={gallery.config.threshold || 80}
                 showControls={true}
+                editMode={true}
+                galleryId={gallery.id}
+                onUpdate={loadGallery}
+                initialName={gallery.config.branding?.customName || ''}
+                initialNameLink={gallery.config.branding?.customNameLink || ''}
+                initialEmail={gallery.config.branding?.customEmail || ''}
+                galleryConfig={gallery.config}
                 theme={{
-                    controlsBg: currentTheme.bgAlt,
+                    controlsBg: currentTheme.bg,
                     controlsText: currentTheme.text
                 }}
             />

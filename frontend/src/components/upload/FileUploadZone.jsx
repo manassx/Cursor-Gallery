@@ -34,13 +34,15 @@ const FileUploadZone = ({onFilesSelected, maxFiles = GALLERY_CONFIG.MAX_IMAGES})
                 setErrors([`Maximum ${maxFiles} images allowed`]);
                 return prev;
             }
+
+            // Notify parent with updated file list
+            if (onFilesSelected) {
+                const allFiles = newFiles.map(f => f.file);
+                onFilesSelected(allFiles);
+            }
+
             return newFiles;
         });
-
-        // Notify parent component
-        if (onFilesSelected) {
-            onFilesSelected(acceptedFiles);
-        }
 
         // Handle rejected files
         if (rejectedFiles.length > 0) {
@@ -68,7 +70,15 @@ const FileUploadZone = ({onFilesSelected, maxFiles = GALLERY_CONFIG.MAX_IMAGES})
             if (file) {
                 URL.revokeObjectURL(file.preview);
             }
-            return prev.filter(f => f.id !== id);
+            const updatedFiles = prev.filter(f => f.id !== id);
+
+            // Notify parent component with updated file list
+            if (onFilesSelected) {
+                const remainingFiles = updatedFiles.map(f => f.file);
+                onFilesSelected(remainingFiles);
+            }
+
+            return updatedFiles;
         });
         setErrors([]);
     };
@@ -77,6 +87,11 @@ const FileUploadZone = ({onFilesSelected, maxFiles = GALLERY_CONFIG.MAX_IMAGES})
         selectedFiles.forEach(({preview}) => URL.revokeObjectURL(preview));
         setSelectedFiles([]);
         setErrors([]);
+
+        // Notify parent that all files were cleared
+        if (onFilesSelected) {
+            onFilesSelected([]);
+        }
     };
 
     // Cleanup previews on unmount
