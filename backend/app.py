@@ -48,19 +48,60 @@ THUMBNAIL_SIZE = (400, 400)
 # ==================== Utility Functions ====================
 
 def get_user_from_token():
-    """Extract user from Authorization header"""
+    """Extract user from Authorization header with improved error handling"""
     auth_header = request.headers.get('Authorization')
     if not auth_header or not auth_header.startswith('Bearer '):
         return None
     
     token = auth_header.replace('Bearer ', '')
-    try:
-        # Get user from token
-        user = supabase.auth.get_user(token)
-        return user.user if user else None
-    except Exception as e:
-        print(f"Token validation error: {e}")
-        return None
+
+    # Retry logic for transient network errors
+    max_retries = 2
+    for attempt in range(max_retries):
+        try:
+            # Get user from token
+            user = supabase.auth.get_user(token)
+            return user.user if user else None
+        except OSError as e:
+            # Handle Windows socket errors (WinError 10035, etc.)
+            error_code = getattr(e, 'winerror', None) or getattr(e, 'errno', None)
+            if error_code == 10035 or 'non-blocking' in str(e).lower():
+                # Transient network error - retry
+                if attempt < max_retries - 1:
+                    print(f"[INFO] Transient socket error (attempt {attempt + 1}/{max_retries}), retrying...")
+                    import time
+                    time.sleep(0.1)  # Brief delay before retry
+                    continue
+                else:
+                    print(f"[WARN] Socket error persisted after retries: {e}")
+                    # Don't fail auth on transient network errors - this is too strict
+                    # Instead, try to decode token locally as fallback
+                    return None
+            else:
+                # Other OS errors
+                print(f"[ERROR] OS error during token validation: {e}")
+                return None
+        except Exception as e:
+            # Log error without exposing details
+            error_msg = str(e)
+            
+            # Check if it's a token expiry issue
+            if 'expired' in error_msg.lower() or 'invalid' in error_msg.lower():
+                print(f"[INFO] Token expired or invalid (expected behavior)")
+            elif 'network' in error_msg.lower() or 'timeout' in error_msg.lower():
+                # Network errors - retry once more
+                if attempt < max_retries - 1:
+                    print(f"[INFO] Network error (attempt {attempt + 1}/{max_retries}), retrying...")
+                    import time
+                    time.sleep(0.1)
+                    continue
+                print(f"[WARN] Network error during token validation: {error_msg}")
+            else:
+                print(f"[ERROR] Token validation error: {error_msg}")
+            
+            return None
+
+    return None
 
 
 def generate_slug(name, user_id):

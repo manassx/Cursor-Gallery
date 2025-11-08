@@ -15,19 +15,27 @@ import androidx.navigation.navArgument
 import com.runanywhere.startup_hackathon20.data.local.AppPreferences
 import com.runanywhere.startup_hackathon20.ui.screens.*
 import com.runanywhere.startup_hackathon20.viewmodel.GalleryViewModel
+import com.runanywhere.startup_hackathon20.viewmodel.CloudGalleryViewModel
 
 sealed class Screen(val route: String) {
     object Welcome : Screen("welcome")
     object Login : Screen("login")
     object Signup : Screen("signup")
     object GalleryList : Screen("gallery_list")
+    object CloudDashboard : Screen("cloud_dashboard")
     object Settings : Screen("settings")
     object CreateGallery : Screen("create_gallery")
     object GalleryDetail : Screen("gallery_detail/{galleryId}") {
         fun createRoute(galleryId: Long) = "gallery_detail/$galleryId"
     }
+    object CloudGalleryDetail : Screen("cloud_gallery_detail/{galleryId}") {
+        fun createRoute(galleryId: String) = "cloud_gallery_detail/$galleryId"
+    }
     object Preview : Screen("preview/{galleryId}") {
         fun createRoute(galleryId: Long) = "preview/$galleryId"
+    }
+    object CloudPreview : Screen("cloud_preview/{galleryId}") {
+        fun createRoute(galleryId: String) = "cloud_preview/$galleryId"
     }
 }
 
@@ -40,12 +48,13 @@ fun NavGraph(
 ) {
     val context = LocalContext.current
     val prefs = remember { AppPreferences(context) }
+    val cloudViewModel: CloudGalleryViewModel = viewModel()
 
     // Determine start destination
     val startDestination = when {
         prefs.isFirstTime -> Screen.Welcome.route
         !prefs.isLoggedIn -> Screen.Login.route
-        else -> Screen.GalleryList.route
+        else -> Screen.CloudDashboard.route
     }
 
     NavHost(
@@ -76,7 +85,7 @@ fun NavGraph(
                     prefs.isLoggedIn = true
                     prefs.userEmail = email
                     prefs.userName = name
-                    navController.navigate(Screen.GalleryList.route) {
+                    navController.navigate(Screen.CloudDashboard.route) {
                         popUpTo(Screen.Login.route) { inclusive = true }
                     }
                 },
@@ -94,7 +103,7 @@ fun NavGraph(
                     prefs.isLoggedIn = true
                     prefs.userEmail = email
                     prefs.userName = name
-                    navController.navigate(Screen.GalleryList.route) {
+                    navController.navigate(Screen.CloudDashboard.route) {
                         popUpTo(Screen.Signup.route) { inclusive = true }
                     }
                 },
@@ -104,17 +113,45 @@ fun NavGraph(
             )
         }
 
-        // Gallery List Screen
-        composable(Screen.GalleryList.route) {
-            GalleryListScreen(
-                viewModel = galleryViewModel,
-                onNavigateToCreate = { navController.navigate(Screen.CreateGallery.route) },
-                onNavigateToDetail = { galleryId ->
-                    navController.navigate(Screen.GalleryDetail.createRoute(galleryId))
+        // Cloud Dashboard Screen (NEW - synced with web)
+        composable(Screen.CloudDashboard.route) {
+            CloudDashboardScreen(
+                viewModel = cloudViewModel,
+                onGalleryClick = { galleryId ->
+                    navController.navigate(Screen.CloudGalleryDetail.createRoute(galleryId))
                 },
                 onNavigateToSettings = {
                     navController.navigate(Screen.Settings.route)
                 }
+            )
+        }
+
+        // Cloud Gallery Detail Screen (NEW - with loading/caching)
+        composable(
+            route = Screen.CloudGalleryDetail.route,
+            arguments = listOf(navArgument("galleryId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val galleryId = backStackEntry.arguments?.getString("galleryId") ?: return@composable
+            CloudGalleryDetailScreen(
+                galleryId = galleryId,
+                viewModel = cloudViewModel,
+                onBackClick = { navController.popBackStack() },
+                onPreviewClick = {
+                    navController.navigate(Screen.CloudPreview.createRoute(galleryId))
+                }
+            )
+        }
+
+        // Cloud Preview Screen (NEW - cursor trail with cached images)
+        composable(
+            route = Screen.CloudPreview.route,
+            arguments = listOf(navArgument("galleryId") { type = NavType.StringType })
+        ) { backStackEntry ->
+            val galleryId = backStackEntry.arguments?.getString("galleryId") ?: return@composable
+            CloudPreviewScreen(
+                galleryId = galleryId,
+                viewModel = cloudViewModel,
+                onNavigateBack = { navController.popBackStack() }
             )
         }
 
@@ -130,10 +167,26 @@ fun NavGraph(
                 onLogout = {
                     prefs.logout()
                     navController.navigate(Screen.Login.route) {
-                        popUpTo(Screen.GalleryList.route) { inclusive = true }
+                        popUpTo(Screen.CloudDashboard.route) { inclusive = true }
                     }
                 },
                 onNavigateBack = { navController.popBackStack() }
+            )
+        }
+
+        // OLD LOCAL SCREENS (kept for backward compatibility if needed)
+
+        // Gallery List Screen
+        composable(Screen.GalleryList.route) {
+            GalleryListScreen(
+                viewModel = galleryViewModel,
+                onNavigateToCreate = { navController.navigate(Screen.CreateGallery.route) },
+                onNavigateToDetail = { galleryId ->
+                    navController.navigate(Screen.GalleryDetail.createRoute(galleryId))
+                },
+                onNavigateToSettings = {
+                    navController.navigate(Screen.Settings.route)
+                }
             )
         }
 

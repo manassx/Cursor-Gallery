@@ -7,7 +7,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.*
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
@@ -17,7 +16,6 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
@@ -66,16 +64,16 @@ fun PreviewScreen(
     var nextImageIndex by remember { mutableIntStateOf(0) }
     var lastPosition by remember { mutableStateOf<Offset?>(null) }
     var canvasSize by remember { mutableStateOf(IntSize.Zero) }
-    var threshold by remember { mutableIntStateOf(40) }
+    var threshold by remember { mutableIntStateOf(80) }
     var lightboxOpen by remember { mutableStateOf(false) }
     var lightboxImageUri by remember { mutableStateOf<String?>(null) }
     var lightboxImageIndex by remember { mutableIntStateOf(0) }
 
-    // Calculate max images based on threshold (matching web app)
+    // Max images based on threshold (web version mobile logic)
     val maxImages = when {
-        threshold <= 20 -> 15
-        threshold <= 40 -> 10
-        else -> 6
+        threshold <= 20 -> 8
+        threshold <= 40 -> 5
+        else -> 3
     }
 
     LaunchedEffect(galleryId) {
@@ -87,7 +85,6 @@ fun PreviewScreen(
             .fillMaxSize()
             .background(Color.Black)
     ) {
-        // Canvas for drawing images
         Canvas(
             modifier = Modifier
                 .fillMaxSize()
@@ -97,6 +94,7 @@ fun PreviewScreen(
                 .pointerInput(Unit) {
                     detectDragGestures { change, _ ->
                         val position = change.position
+                        change.consume()
 
                         val shouldPlace = lastPosition?.let { last ->
                             val distanceX = abs(position.x - last.x)
@@ -113,13 +111,13 @@ fun PreviewScreen(
 
                                 scope.launch {
                                     try {
-                                        val screenWidth = canvasSize.width
-                                        val screenHeight = canvasSize.height
+                                        val screenWidth = canvasSize.width.toFloat()
+                                        val screenHeight = canvasSize.height.toFloat()
 
-                                        // INCREASED: min 200px, max 80vw/55vh
-                                        val minWidth = with(density) { 200.dp.toPx() }
-                                        val maxWidth = screenWidth * 0.8f
-                                        val maxHeight = screenHeight * 0.55f
+                                        // Larger images: min 250px, max 70vw/60vh
+                                        val minWidth = with(density) { 250.dp.toPx() }
+                                        val maxWidth = screenWidth * 0.7f
+                                        val maxHeight = screenHeight * 0.6f
 
                                         val targetSize = min(maxWidth, maxHeight).toInt()
 
@@ -138,30 +136,28 @@ fun PreviewScreen(
                                                 var displayWidth = it.width.toFloat()
                                                 var displayHeight = it.height.toFloat()
 
+                                                // Ensure minimum size
                                                 if (displayWidth < minWidth) {
                                                     displayWidth = minWidth
                                                     displayHeight = displayWidth / aspectRatio
                                                 }
 
+                                                // Constrain to max width
                                                 if (displayWidth > maxWidth) {
                                                     displayWidth = maxWidth
                                                     displayHeight = displayWidth / aspectRatio
                                                 }
+
+                                                // Constrain to max height
                                                 if (displayHeight > maxHeight) {
                                                     displayHeight = maxHeight
                                                     displayWidth = displayHeight * aspectRatio
                                                 }
 
-                                                // Offset images UPWARD so finger doesn't hide them
-                                                val offsetY = with(density) { 120.dp.toPx() }
-                                                val adjustedPosition = Offset(
-                                                    position.x,
-                                                    position.y - offsetY // Move up by 120dp
-                                                )
-
+                                                // Use exact touch position
                                                 placedImages = (placedImages + PlacedImage(
                                                     bitmap = it,
-                                                    position = adjustedPosition, // Use offset position
+                                                    position = position,
                                                     size = Size(displayWidth, displayHeight),
                                                     uri = imageUri
                                                 )).takeLast(maxImages)
@@ -179,7 +175,6 @@ fun PreviewScreen(
                 }
                 .pointerInput(Unit) {
                     detectTapGestures { offset ->
-                        // Check if tapped on an image
                         placedImages.reversed().forEach { placedImage ->
                             val left = placedImage.position.x - placedImage.size.width / 2
                             val top = placedImage.position.y - placedImage.size.height / 2
@@ -189,7 +184,6 @@ fun PreviewScreen(
                             if (offset.x >= left && offset.x <= right &&
                                 offset.y >= top && offset.y <= bottom
                             ) {
-                                // Find index of this image in gallery
                                 currentGallery?.images?.indexOfFirst { it.imagePath == placedImage.uri }
                                     ?.let { index ->
                                         lightboxImageUri = placedImage.uri
@@ -202,7 +196,6 @@ fun PreviewScreen(
                     }
                 }
         ) {
-            // Draw all images with FULL opacity (no fade)
             placedImages.forEach { placedImage ->
                 translate(
                     left = placedImage.position.x - placedImage.size.width / 2,
@@ -213,109 +206,102 @@ fun PreviewScreen(
                         dstSize = androidx.compose.ui.unit.IntSize(
                             placedImage.size.width.toInt(),
                             placedImage.size.height.toInt()
-                        ),
-                        alpha = 1f // FULL OPACITY
+                        )
                     )
                 }
             }
         }
 
-        // Top-left: Close button
-        IconButton(
-            onClick = onNavigateBack,
-            modifier = Modifier
-                .align(Alignment.TopStart)
-                .padding(16.dp)
-                .size(48.dp)
-                .background(Color.Black.copy(alpha = 0.3f), CircleShape),
-            colors = IconButtonDefaults.iconButtonColors(
-                containerColor = Color.Transparent
-            )
-        ) {
-            Icon(
-                Icons.Default.Close,
-                contentDescription = "Close",
-                tint = Color.White,
-                modifier = Modifier.size(24.dp)
-            )
-        }
-
-        // Top-right: Threshold control (floating, compact)
+        // Bottom controls bar (matching web)
         Surface(
             modifier = Modifier
-                .align(Alignment.TopEnd)
-                .padding(16.dp),
-            shape = RoundedCornerShape(24.dp),
-            color = Color.Black.copy(alpha = 0.6f)
+                .align(Alignment.BottomCenter)
+                .fillMaxWidth(),
+            color = Color.Transparent
         ) {
             Row(
-                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 12.dp, vertical = 8.dp),
+                horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically
             ) {
+                // Close button
                 IconButton(
-                    onClick = {
-                        threshold = when {
-                            threshold > 140 -> threshold - 60
-                            threshold > 80 -> threshold - 40
-                            threshold > 40 -> threshold - 20
-                            threshold > 20 -> threshold - 20
-                            else -> 20
-                        }.coerceIn(20, 80)
-                    },
-                    modifier = Modifier.size(32.dp)
+                    onClick = onNavigateBack,
+                    modifier = Modifier.size(40.dp)
                 ) {
-                    Text(
-                        text = "−",
-                        color = Color.White,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Light
+                    Icon(
+                        Icons.Default.Close,
+                        contentDescription = "Close",
+                        tint = Color.White
                     )
                 }
 
-                Text(
-                    text = threshold.toString(),
-                    color = Color.White,
-                    fontSize = 16.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier.widthIn(min = 32.dp)
-                )
-
-                IconButton(
-                    onClick = {
-                        if (threshold >= 80) return@IconButton
-                        threshold = when {
-                            threshold < 40 -> threshold + 20
-                            threshold < 80 -> threshold + 40
-                            else -> 80
-                        }.coerceIn(20, 80)
-                    },
-                    modifier = Modifier.size(32.dp)
+                // Threshold control
+                Row(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "+",
+                        text = "Threshold:",
                         color = Color.White,
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Light
+                        fontSize = 14.sp
                     )
+
+                    IconButton(
+                        onClick = {
+                            threshold = when {
+                                threshold > 140 -> threshold - 60
+                                threshold > 80 -> threshold - 40
+                                threshold > 40 -> threshold - 20
+                                threshold > 20 -> threshold - 20
+                                else -> 20
+                            }.coerceIn(20, 200)
+                        },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Text(
+                            text = "−",
+                            color = Color.White,
+                            fontSize = 20.sp
+                        )
+                    }
+
+                    Text(
+                        text = threshold.toString(),
+                        color = Color.White,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Medium,
+                        modifier = Modifier.widthIn(min = 40.dp)
+                    )
+
+                    IconButton(
+                        onClick = {
+                            threshold = when {
+                                threshold < 40 -> threshold + 20
+                                threshold < 80 -> threshold + 40
+                                threshold < 140 -> threshold + 60
+                                threshold < 200 -> threshold + 60
+                                else -> 200
+                            }.coerceIn(20, 200)
+                        },
+                        modifier = Modifier.size(32.dp)
+                    ) {
+                        Text(
+                            text = "+",
+                            color = Color.White,
+                            fontSize = 20.sp
+                        )
+                    }
                 }
+
+                // Spacer for balance
+                Spacer(modifier = Modifier.width(40.dp))
             }
         }
 
-        // Top-center: Gallery name
-        if (currentGallery != null && placedImages.isEmpty()) {
-            Text(
-                text = currentGallery?.gallery?.name ?: "",
-                color = Color.White.copy(alpha = 0.8f),
-                fontSize = 18.sp,
-                fontWeight = FontWeight.Medium,
-                modifier = Modifier
-                    .align(Alignment.TopCenter)
-                    .padding(top = 24.dp)
-            )
-        }
-
-        // Instructions (only show when no images)
+        // Instructions
         if (placedImages.isEmpty()) {
             Column(
                 modifier = Modifier
@@ -339,7 +325,7 @@ fun PreviewScreen(
         }
     }
 
-    // Fullscreen Lightbox
+    // Lightbox
     if (lightboxOpen && lightboxImageUri != null && currentGallery != null) {
         Dialog(
             onDismissRequest = { lightboxOpen = false },
@@ -348,92 +334,65 @@ fun PreviewScreen(
             Box(
                 modifier = Modifier
                     .fillMaxSize()
-                    .background(Color.Black.copy(alpha = 0.95f))
+                    .background(Color.Black.copy(alpha = 0.7f))
                     .clickable { lightboxOpen = false }
             ) {
-                // Main image
                 SubcomposeAsyncImage(
                     model = File(currentGallery!!.images[lightboxImageIndex].imagePath),
                     contentDescription = null,
                     modifier = Modifier
                         .align(Alignment.Center)
-                        .fillMaxWidth(0.95f)
-                        .fillMaxHeight(0.9f)
+                        .fillMaxWidth(0.9f)
+                        .fillMaxHeight(0.85f)
                         .clickable(enabled = false) { },
                     contentScale = ContentScale.Fit
                 )
 
-                // Close button
                 IconButton(
                     onClick = { lightboxOpen = false },
                     modifier = Modifier
                         .align(Alignment.TopEnd)
                         .padding(16.dp)
-                        .size(48.dp)
-                        .background(Color.Black.copy(alpha = 0.3f), CircleShape)
                 ) {
                     Icon(
                         Icons.Default.Close,
                         contentDescription = "Close",
-                        tint = Color.White,
-                        modifier = Modifier.size(24.dp)
+                        tint = Color.White.copy(alpha = 0.8f),
+                        modifier = Modifier.size(32.dp)
                     )
                 }
 
-                // Previous button
                 if (lightboxImageIndex > 0) {
                     IconButton(
-                        onClick = {
-                            lightboxImageIndex--
-                        },
+                        onClick = { lightboxImageIndex-- },
                         modifier = Modifier
                             .align(Alignment.CenterStart)
-                            .padding(16.dp)
-                            .size(56.dp)
-                            .background(Color.Black.copy(alpha = 0.3f), CircleShape)
+                            .padding(8.dp)
                     ) {
                         Icon(
                             Icons.Default.ArrowBack,
                             contentDescription = "Previous",
-                            tint = Color.White,
-                            modifier = Modifier.size(28.dp)
+                            tint = Color.White.copy(alpha = 0.6f),
+                            modifier = Modifier.size(48.dp)
                         )
                     }
                 }
 
-                // Next button
                 if (lightboxImageIndex < currentGallery!!.images.size - 1) {
                     IconButton(
-                        onClick = {
-                            lightboxImageIndex++
-                        },
+                        onClick = { lightboxImageIndex++ },
                         modifier = Modifier
                             .align(Alignment.CenterEnd)
-                            .padding(16.dp)
-                            .size(56.dp)
-                            .background(Color.Black.copy(alpha = 0.3f), CircleShape)
+                            .padding(8.dp)
                     ) {
                         Icon(
                             Icons.Default.ArrowForward,
                             contentDescription = "Next",
-                            tint = Color.White,
-                            modifier = Modifier.size(28.dp)
+                            tint = Color.White.copy(alpha = 0.6f),
+                            modifier = Modifier.size(48.dp)
                         )
                     }
                 }
-
-                // Image counter
-                Text(
-                    text = "${lightboxImageIndex + 1} / ${currentGallery!!.images.size}",
-                    color = Color.White.copy(alpha = 0.8f),
-                    fontSize = 14.sp,
-                    fontWeight = FontWeight.Medium,
-                    modifier = Modifier
-                        .align(Alignment.BottomCenter)
-                        .padding(bottom = 32.dp)
-                        .background(Color.Black.copy(alpha = 0.3f), RoundedCornerShape(16.dp))
-                        .padding(horizontal = 16.dp, vertical = 8.dp)
-                )
             }
         }
     }

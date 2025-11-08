@@ -32,6 +32,13 @@ class NetworkRepository(private val context: Context) {
         }
     }
 
+    suspend fun googleAuth(idToken: String, email: String, name: String): Result<AuthResponse> {
+        return safeApiCall {
+            val request = GoogleAuthRequest(idToken, email, name)
+            apiService.googleAuth(request)
+        }
+    }
+
     suspend fun logout(): Result<MessageResponse> {
         return safeApiCall {
             apiService.logout()

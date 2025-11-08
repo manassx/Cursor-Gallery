@@ -26,6 +26,7 @@ import com.runanywhere.startup_hackathon20.data.local.AppPreferences
 import com.runanywhere.startup_hackathon20.data.remote.GoogleAuthHelper
 import com.runanywhere.startup_hackathon20.data.remote.NetworkRepository
 import kotlinx.coroutines.launch
+import android.util.Log
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -105,26 +106,56 @@ fun LoginScreen(
 
                     coroutineScope.launch {
                         try {
+                            Log.d("LoginScreen", "Starting Google Sign-In...")
                             val result = googleAuthHelper.signInWithGoogle()
 
                             if (result.isSuccess) {
                                 val googleResult = result.getOrThrow()
+                                Log.d("LoginScreen", "Google Sign-In successful: ${googleResult.email}")
 
-                                // TODO: Send Google ID token to backend for verification
-                                // For now, auto-login with Google account
-                                prefs.isLoggedIn = true
-                                prefs.userEmail = googleResult.email
-                                prefs.userName = googleResult.displayName
-                                prefs.userId = googleResult.email // Temporary
+                                // Send Google ID token to backend for verification
+                                Log.d("LoginScreen", "Sending to backend...")
+                                val authResult = networkRepository.googleAuth(
+                                    googleResult.idToken,
+                                    googleResult.email,
+                                    googleResult.displayName
+                                )
 
-                                onLoginSuccess(googleResult.email, googleResult.displayName)
+                                if (authResult.isSuccess) {
+                                    val authResponse = authResult.getOrThrow()
+                                    Log.d("LoginScreen", "Backend auth successful: ${authResponse.user.id}")
+                                    Log.d("LoginScreen", "Token received: ${authResponse.token.take(20)}...")
+
+                                    // Save to preferences
+                                    prefs.isLoggedIn = true
+                                    prefs.userEmail = authResponse.user.email
+                                    prefs.userName = authResponse.user.name
+                                    prefs.userId = authResponse.user.id
+                                    prefs.authToken = authResponse.token
+                                    
+                                    Log.d("LoginScreen", "Credentials saved successfully")
+
+                                    // Navigate to dashboard
+                                    onLoginSuccess(authResponse.user.email, authResponse.user.name)
+                                } else {
+                                    val exception = authResult.exceptionOrNull()
+                                    val errorMsg = exception?.message ?: "Failed to authenticate with backend"
+                                    Log.e("LoginScreen", "Backend auth failed: $errorMsg", exception)
+                                    
+                                    // Show the actual error
+                                    errorMessage = "Backend error: $errorMsg"
+                                    isGoogleLoading = false
+                                }
                             } else {
-                                errorMessage =
-                                    result.exceptionOrNull()?.message ?: "Google sign-in failed"
+                                val exception = result.exceptionOrNull()
+                                val errorMsg = exception?.message ?: "Google sign-in failed"
+                                Log.e("LoginScreen", "Google Sign-In failed: $errorMsg", exception)
+                                errorMessage = "Google sign-in failed: $errorMsg"
                                 isGoogleLoading = false
                             }
                         } catch (e: Exception) {
-                            errorMessage = e.message ?: "Google sign-in error"
+                            Log.e("LoginScreen", "Critical error during Google auth", e)
+                            errorMessage = "Error: ${e.message}"
                             isGoogleLoading = false
                         }
                     }
@@ -190,7 +221,7 @@ fun LoginScreen(
             OutlinedTextField(
                 value = email,
                 onValueChange = {
-                email = it
+                    email = it
                     errorMessage = null
                 },
                 modifier = Modifier.fillMaxWidth(),
@@ -210,7 +241,7 @@ fun LoginScreen(
             OutlinedTextField(
                 value = password,
                 onValueChange = {
-                password = it
+                    password = it
                     errorMessage = null
                 },
                 modifier = Modifier.fillMaxWidth(),
@@ -251,11 +282,14 @@ fun LoginScreen(
                                     // Navigate to dashboard
                                     onLoginSuccess(authResponse.user.email, authResponse.user.name)
                                 } else {
-                                    errorMessage =
-                                        result.exceptionOrNull()?.message ?: "Login failed"
+                                    val exception = result.exceptionOrNull()
+                                    val errorMsg = exception?.message ?: "Login failed"
+                                    Log.e("LoginScreen", "Login failed: $errorMsg", exception)
+                                    errorMessage = errorMsg
                                     isLoading = false
                                 }
                             } catch (e: Exception) {
+                                Log.e("LoginScreen", "Network error", e)
                                 errorMessage = e.message ?: "Network error"
                                 isLoading = false
                             }

@@ -26,7 +26,7 @@ object ApiClient {
     }
     
     private fun createApiService(context: Context): ApiService {
-        val prefs = AppPreferences(context.applicationContext)
+        val appContext = context.applicationContext
         
         // Logging interceptor for debugging
         val loggingInterceptor = HttpLoggingInterceptor().apply {
@@ -38,12 +38,16 @@ object ApiClient {
             val originalRequest = chain.request()
             val requestBuilder = originalRequest.newBuilder()
             
-            // Get token from preferences
+            // Get token from preferences DYNAMICALLY on each request
+            val prefs = AppPreferences(appContext)
             val token = prefs.authToken
             
             // Add Authorization header if token exists
             if (!token.isNullOrEmpty()) {
                 requestBuilder.addHeader("Authorization", "Bearer $token")
+                android.util.Log.d("ApiClient", "Using token: ${token.take(20)}...")
+            } else {
+                android.util.Log.w("ApiClient", "No auth token available!")
             }
             
             // Add other headers

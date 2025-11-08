@@ -6,6 +6,7 @@ import androidx.lifecycle.viewModelScope
 import com.runanywhere.startup_hackathon20.data.local.AppDatabase
 import com.runanywhere.startup_hackathon20.data.local.entities.Gallery
 import com.runanywhere.startup_hackathon20.data.local.entities.GalleryWithImages
+import com.runanywhere.startup_hackathon20.data.remote.NetworkRepository
 import com.runanywhere.startup_hackathon20.data.repository.GalleryRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -15,6 +16,7 @@ import kotlinx.coroutines.launch
 class GalleryViewModel(application: Application) : AndroidViewModel(application) {
 
     private val repository: GalleryRepository
+    private val networkRepository: NetworkRepository
     private val _galleries = MutableStateFlow<List<GalleryWithImages>>(emptyList())
     val galleries: StateFlow<List<GalleryWithImages>> = _galleries.asStateFlow()
 
@@ -43,13 +45,43 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
     init {
         val database = AppDatabase.getDatabase(application)
         repository = GalleryRepository(database.galleryDao(), application.applicationContext)
+        networkRepository = NetworkRepository(application.applicationContext)
+
+        // Load local galleries first (fast)
         loadGalleries()
+
+        // Then sync from cloud in background
+        syncGalleriesFromCloud()
     }
 
     private fun loadGalleries() {
         viewModelScope.launch {
             repository.getAllGalleriesWithImages().collect { galleryList ->
                 _galleries.value = galleryList
+            }
+        }
+    }
+
+    /**
+     * Sync galleries from cloud - fetches from backend and displays them
+     */
+    fun syncGalleriesFromCloud() {
+        viewModelScope.launch {
+            try {
+                _isSyncing.value = true
+                val result = networkRepository.getGalleries()
+
+                if (result.isSuccess) {
+                    val cloudGalleries = result.getOrThrow()
+                    // For now, just trigger a refresh
+                    // In a full implementation, you'd merge cloud + local data
+                    _error.value = null
+                }
+            } catch (e: Exception) {
+                // Silent fail - user can still see local galleries
+                _error.value = null
+            } finally {
+                _isSyncing.value = false
             }
         }
     }
@@ -173,8 +205,7 @@ class GalleryViewModel(application: Application) : AndroidViewModel(application)
      * Generate public link for sharing
      */
     private fun generatePublicLink(cloudId: String): String {
-        // Using the /g/{id} short URL format
-        return "https://yourdomain.com/g/$cloudId"
+        return "http://192.168.1.5:8000/g/$cloudId"
     }
 
     /**

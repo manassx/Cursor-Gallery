@@ -15,6 +15,12 @@ data class LoginRequest(
     val password: String
 )
 
+data class GoogleAuthRequest(
+    val idToken: String,
+    val email: String,
+    val name: String
+)
+
 data class CreateGalleryRequest(
     val name: String,
     val description: String,
