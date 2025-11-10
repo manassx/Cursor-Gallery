@@ -87,10 +87,8 @@ internal class AiStudioViewModel : ViewModel() {
     val uiState: StateFlow<AiStudioUiState> = _uiState.asStateFlow()
 
     init {
-        viewModelScope.launch {
-            val refreshed = RunAnywhereManager.refreshModels()
-            _uiState.value = _uiState.value.copy(models = refreshed)
-        }
+        // Don't call refreshModels() here - wait for SDK to initialize first
+        // The UI will trigger refresh when needed
         viewModelScope.launch {
             RunAnywhereManager.currentModelId.collect { modelId ->
                 _uiState.value = _uiState.value.copy(currentModelId = modelId)

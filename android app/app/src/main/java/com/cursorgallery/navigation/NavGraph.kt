@@ -136,7 +136,9 @@ fun NavGraph(
         }
 
         composable(Screen.AiStudio.route) {
-            AiStudioBlueprintScreen()
+            AiStudioBlueprintScreen(
+                onNavigateBack = { navController.popBackStack() }
+            )
         }
     }
 }

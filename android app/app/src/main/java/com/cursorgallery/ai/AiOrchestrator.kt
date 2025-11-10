@@ -7,7 +7,7 @@ import com.google.gson.Gson
 import com.google.gson.JsonSyntaxException
 import com.runanywhere.sdk.public.RunAnywhere
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.fold
 import kotlinx.coroutines.withContext
 
 internal object AiOrchestrator {
@@ -19,10 +19,6 @@ internal object AiOrchestrator {
         userPrompt: String,
         gallery: Gallery
     ): Result<MoodPresetSuggestion> {
-        if (!isModelReady()) {
-            return Result.failure(IllegalStateException("No AI model is loaded"))
-        }
-
         val prompt = AiBlueprintDocumentation.moodDjPromptTemplate(userPrompt, gallery)
         return executeJsonRequest(prompt) { json ->
             gson.fromJson(json, MoodPresetSuggestion::class.java)
@@ -33,9 +29,6 @@ internal object AiOrchestrator {
         gallery: Gallery,
         images: List<GalleryImage>
     ): Result<ImageSequencePlan> {
-        if (!isModelReady()) {
-            return Result.failure(IllegalStateException("No AI model is loaded"))
-        }
         if (images.isEmpty()) {
             return Result.failure(IllegalArgumentException("No images available for sequencing"))
         }
@@ -50,9 +43,6 @@ internal object AiOrchestrator {
         gallery: Gallery,
         images: List<GalleryImage>
     ): Result<CritiqueReport> {
-        if (!isModelReady()) {
-            return Result.failure(IllegalStateException("No AI model is loaded"))
-        }
         if (images.isEmpty()) {
             return Result.failure(IllegalArgumentException("No images available for critique"))
         }
@@ -68,21 +58,43 @@ internal object AiOrchestrator {
         parse: (String) -> T
     ): Result<T> = withContext(Dispatchers.IO) {
         runCatching {
-            val raw = RunAnywhere.generate(prompt)
-            val jsonPayload = sanitizeResponse(raw)
-            parse(jsonPayload)
-        }.onFailure { throwable ->
-            if (throwable is JsonSyntaxException) {
-                Log.e(TAG, "Failed to parse AI response", throwable)
-            } else {
-                Log.e(TAG, "AI execution failed", throwable)
-            }
-        }
-    }
+            Log.d(TAG, "Calling RunAnywhere.generateStream with prompt length: ${prompt.length}")
+            System.err.println("=== Starting generation with generateStream ===")
 
-    private suspend fun isModelReady(): Boolean {
-        if (!AiFeatureToggle.isEnabled) return false
-        return RunAnywhereManager.currentModelId.first() != null
+            // Use generateStream exactly like ChatViewModel does, collecting all tokens
+            var fullResponse = ""
+            RunAnywhere.generateStream(prompt).fold(fullResponse) { acc, token ->
+                acc + token
+            }
+
+            Log.d(TAG, "Received full response length: ${fullResponse.length}")
+            Log.d(TAG, "Raw response: $fullResponse")
+            System.err.println("=== Received full response ===")
+            System.err.println("Raw: ${fullResponse.take(500)}")
+
+            val jsonPayload = sanitizeResponse(fullResponse)
+            Log.d(TAG, "Sanitized JSON: $jsonPayload")
+            System.err.println("Sanitized JSON: ${jsonPayload.take(500)}")
+
+            val parsed = parse(jsonPayload)
+
+            // Check if parsing resulted in null
+            if (parsed == null) {
+                throw IllegalStateException(
+                    "JSON parsing returned null. Raw response: ${
+                        fullResponse.take(
+                            200
+                        )
+                    }"
+                )
+            }
+
+            parsed
+        }.onFailure { throwable ->
+            Log.e(TAG, "AI execution failed", throwable)
+            System.err.println("=== Generation failed: ${throwable.message} ===")
+            throwable.printStackTrace()
+        }
     }
 
     private fun sanitizeResponse(rawResponse: String): String {

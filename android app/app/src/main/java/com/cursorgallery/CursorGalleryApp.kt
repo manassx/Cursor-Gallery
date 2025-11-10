@@ -1,6 +1,7 @@
 package com.cursorgallery
 
 import android.app.Application
+import android.util.Log
 import coil.ImageLoader
 import coil.ImageLoaderFactory
 import coil.disk.DiskCache
@@ -13,8 +14,11 @@ class CursorGalleryApp : Application(), ImageLoaderFactory {
 
     override fun onCreate() {
         super.onCreate()
+        Log.d("CursorGalleryApp", "========== APP STARTING ==========")
         instance = this
+        Log.d("CursorGalleryApp", "Calling RunAnywhereManager.initialize()...")
         RunAnywhereManager.initialize(this)
+        Log.d("CursorGalleryApp", "RunAnywhereManager.initialize() called")
     }
 
     override fun newImageLoader(): ImageLoader {

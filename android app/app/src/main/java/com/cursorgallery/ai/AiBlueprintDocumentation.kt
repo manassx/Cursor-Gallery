@@ -18,36 +18,72 @@ internal object AiBlueprintDocumentation {
     }
 
     fun moodDjPromptTemplate(userPrompt: String, gallery: Gallery): String {
-        return buildString {
-            appendLine("System: You design animation presets for cursor-driven art galleries.")
-            appendLine("Gallery name: ${gallery.name}")
-            appendLine("Gallery mood setting: ${gallery.config?.mood ?: "calm"}")
-            appendLine("User vibe request: $userPrompt")
-            appendLine("Respond with JSON containing title, description, animationType, mood, colorPaletteHex[].")
-        }
+        // ULTRA SIMPLE TEST - just ask directly without any formatting
+        return "Generate a JSON object with these fields: title (string), description (string), primaryColor (hex code like #FF5733), secondaryColor (hex code). The title should be: $userPrompt"
     }
 
     fun critiquePromptTemplate(gallery: Gallery, images: List<GalleryImage>): String {
         return buildString {
-            appendLine("System: You are an art curator evaluating a portfolio.")
-            appendLine("Gallery: ${gallery.name}")
-            appendLine("Expect JSON with overallScore, compositionScore, emotionScore, storytellingScore, highlights[], recommendations[].")
-            appendLine("Images summary:")
-            images.forEachIndexed { index, image ->
-                appendLine("${index + 1}. id=${image.id}, notes=${image.metadata?.format ?: "unknown"}")
-            }
+            appendLine("You are a professional art curator reviewing a creative portfolio.")
+            appendLine("Provide constructive feedback on this gallery.")
+            appendLine()
+            appendLine("Gallery Context:")
+            appendLine("- Title: ${gallery.name}")
+            appendLine("- Description: ${gallery.description ?: "No description provided"}")
+            appendLine("- Number of images: ${images.size}")
+            appendLine()
+            appendLine("Evaluate this portfolio on three dimensions:")
+            appendLine("1. Composition: Technical quality, framing, visual balance")
+            appendLine("2. Emotional Resonance: Impact, mood, viewer connection")
+            appendLine("3. Storytelling: Narrative flow, thematic coherence")
+            appendLine()
+            appendLine("Generate a single JSON object with these exact fields:")
+            appendLine("{")
+            appendLine("  \"overallScore\": <0-100>,")
+            appendLine("  \"compositionScore\": <0-100>,")
+            appendLine("  \"emotionScore\": <0-100>,")
+            appendLine("  \"storytellingScore\": <0-100>,")
+            appendLine("  \"highlights\": [\"<strength 1>\", \"<strength 2>\"],")
+            appendLine("  \"recommendations\": [\"<improvement 1>\", \"<improvement 2>\"]")
+            appendLine("}")
+            appendLine()
+            appendLine("Be specific and constructive. Respond ONLY with valid JSON.")
         }
     }
 
     fun sequencingPromptTemplate(gallery: Gallery, images: List<GalleryImage>): String {
         return buildString {
-            appendLine("System: Reorder images for best narrative flow.")
+            appendLine("You are a visual storytelling expert arranging images for maximum impact.")
+            appendLine("Analyze these images and suggest an optimal viewing order.")
+            appendLine()
             appendLine("Gallery: ${gallery.name}")
-            appendLine("Return JSON with orderedImageIds[], rationale[].")
-            appendLine("Image cues:")
-            images.forEach { image ->
-                appendLine("- id=${image.id}, dims=${image.metadata?.width}x${image.metadata?.height}, order=${image.orderIndex}")
+            appendLine("Description: ${gallery.description ?: "No description"}")
+            appendLine()
+            appendLine("Images to sequence:")
+            images.forEachIndexed { index, image ->
+                val dimensions = if (image.metadata?.width != null && image.metadata?.height != null) {
+                    "${image.metadata.width}x${image.metadata.height}"
+                } else {
+                    "unknown size"
+                }
+                appendLine("${index + 1}. ID: ${image.id.take(12)} | Dimensions: $dimensions | Current Position: ${image.orderIndex}")
             }
+            appendLine()
+            appendLine("Consider:")
+            appendLine("- Color harmony and visual transitions")
+            appendLine("- Emotional progression (build tension, create resolution)")
+            appendLine("- Composition flow (varied vs consistent)")
+            appendLine()
+            appendLine("Generate a single JSON object with these exact fields:")
+            appendLine("{")
+            appendLine("  \"orderedImageIds\": [\"<image_id_1>\", \"<image_id_2>\", ...],")
+            appendLine("  \"rationale\": [\"<why position 1>\", \"<why position 2>\", ...]")
+            appendLine("}")
+            appendLine()
+            appendLine("The orderedImageIds array must contain ALL ${images.size} image IDs from the list above.")
+            appendLine("Each rationale should be 1 short sentence explaining that image's position.")
+            appendLine()
+            appendLine("Respond ONLY with valid JSON. No markdown, no explanations outside the JSON.")
         }
     }
 }

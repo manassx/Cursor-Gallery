@@ -10,6 +10,7 @@ import com.runanywhere.sdk.public.extensions.addModelFromURL
 import com.runanywhere.sdk.public.extensions.listAvailableModels
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.GlobalScope
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -35,29 +36,87 @@ internal object RunAnywhereManager {
     private val loadMutex = Mutex()
 
     fun initialize(context: Context) {
-        if (!AiFeatureToggle.isEnabled || initializationState.value is InitializationState.Initialized) {
+        System.err.println("========== RunAnywhereManager.initialize() CALLED ==========")
+        Log.d(
+            TAG,
+            "Initialize called. Feature enabled: ${AiFeatureToggle.isEnabled}, Current state: ${initializationState.value}"
+        )
+        System.err.println("Feature enabled: ${AiFeatureToggle.isEnabled}, Current state: ${initializationState.value}")
+
+        if (!AiFeatureToggle.isEnabled) {
+            Log.w(TAG, "AI features disabled via toggle")
+            System.err.println("ERROR: AI features disabled via toggle")
+            initializationState.value =
+                InitializationState.Failed(IllegalStateException("AI features disabled"))
+            return
+        }
+
+        if (initializationState.value is InitializationState.Initialized) {
+            Log.d(TAG, "Already initialized, skipping")
+            System.err.println("Already initialized, skipping")
             return
         }
 
         initializationJob?.cancel()
 
-        initializationJob = CoroutineScope(Dispatchers.IO).launch {
+        initializationJob = GlobalScope.launch(Dispatchers.IO) {
             initializationState.value = InitializationState.Initializing
+            Log.d(TAG, "Starting SDK initialization...")
+            System.err.println("Starting SDK initialization...")
             try {
+                Log.d(TAG, "Calling RunAnywhere.initialize...")
+                System.err.println("Calling RunAnywhere.initialize...")
                 RunAnywhere.initialize(
                     context = context,
                     apiKey = AiConfig.apiKey,
                     environment = SDKEnvironment.DEVELOPMENT
                 )
+                Log.d(TAG, "SDK initialized successfully")
+                System.err.println("✅ SDK initialized successfully")
 
+                Log.d(TAG, "Registering LlamaCpp provider...")
+                System.err.println("Registering LlamaCpp provider...")
                 LlamaCppServiceProvider.register()
+                Log.d(TAG, "LlamaCpp registered")
+                System.err.println("✅ LlamaCpp registered")
+                
+                Log.d(TAG, "Registering models...")
+                System.err.println("Registering models...")
                 registerModelsSafely()
-                RunAnywhere.scanForDownloadedModels()
+                Log.d(TAG, "Models registered")
+                System.err.println("✅ Models registered")
 
-                availableModels.value = listAvailableModels()
+                // Scan for previously downloaded models
+                Log.d(TAG, "Scanning for downloaded models...")
+                System.err.println("Scanning for downloaded models...")
+                try {
+                    RunAnywhere.scanForDownloadedModels()
+                    Log.d(TAG, "Scan complete")
+                    System.err.println("✅ Scan complete")
+                } catch (e: Exception) {
+                    Log.w(TAG, "Scan failed (non-fatal): ${e.message}")
+                    System.err.println("⚠️ Scan failed: ${e.message}")
+                }
+
+                val modelsList = try {
+                    listAvailableModels()
+                } catch (e: Exception) {
+                    Log.w(TAG, "Could not list models yet: ${e.message}")
+                    System.err.println("WARNING: Could not list models yet: ${e.message}")
+                    emptyList()
+                }
+                Log.d(TAG, "Found ${modelsList.size} models")
+                System.err.println("✅ Found ${modelsList.size} models")
+                availableModels.value = modelsList
+                
                 initializationState.value = InitializationState.Initialized
+                Log.i(TAG, "✅ RunAnywhere initialization complete! Models: ${modelsList.size}")
+                System.err.println("========== ✅ INITIALIZATION COMPLETE ==========")
             } catch (throwable: Throwable) {
-                Log.e(TAG, "RunAnywhere init failed", throwable)
+                Log.e(TAG, "❌ RunAnywhere init failed", throwable)
+                System.err.println("========== ❌ INITIALIZATION FAILED ==========")
+                System.err.println("Error: ${throwable.message}")
+                throwable.printStackTrace()
                 initializationState.value = InitializationState.Failed(throwable)
             }
         }
@@ -79,8 +138,14 @@ internal object RunAnywhereManager {
 
     suspend fun refreshModels(): List<ModelInfo> {
         if (!AiFeatureToggle.isEnabled) return emptyList()
+        
+        // Don't try to scan if SDK isn't initialized yet
+        if (initializationState.value !is InitializationState.Initialized) {
+            Log.w(TAG, "Cannot refresh models - SDK not initialized yet. State: ${initializationState.value}")
+            return availableModels.value
+        }
+        
         return try {
-            RunAnywhere.scanForDownloadedModels()
             val updated = listAvailableModels()
             availableModels.value = updated
             updated

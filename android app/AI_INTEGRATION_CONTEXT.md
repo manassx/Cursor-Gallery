@@ -48,7 +48,8 @@ AI) in the most creative and impactful way possible.
   download, load, unload), state tracking via StateFlow
 - **`AiOrchestrator.kt`**: High-level orchestration layer for running prompts, streaming responses,
   parsing JSON outputs (mood presets, sequence plans, critiques)
-- **Initialization**: Wired into `CursorGalleryApp.onCreate()` so SDK initializes at app startup
+- **Initialization**: Wired into **`com.runanywhere.startup_hackathon20.CursorGalleryApp`** (NOT
+  `com.cursorgallery.CursorGalleryApp` - there are two Application classes!)
 
 #### 2. ViewModel Layer
 
@@ -66,7 +67,9 @@ AI) in the most creative and impactful way possible.
 **AI Studio Screen** (`app/src/main/java/com/cursorgallery/ui/screens/ai/AiStudioBlueprint.kt`):
 
 - Lists available models with download/load/unload controls
-- Shows planned AI actions (Mood DJ, Sequence Oracle, Critique, etc.)
+- Shows SDK status card (Ready/Not initialized/Failed)
+- Displays 3 models: Qwen 2.5 0.5B, SmolLM2 360M, Llama 3.2 1B
+- Download buttons show progress, turn into "Load Model" when complete
 - Accessible from Dashboard via "AI Studio" card
 
 **Gallery Editor Integration** (
@@ -101,75 +104,191 @@ AI) in the most creative and impactful way possible.
 
 #### 5. Model Strategy
 
-- **Primary**: **Qwen 2.5 0.5B Instruct Q6_K** (~400 MB, strong reasoning, best quality)
+- **Primary**: **Qwen 2.5 0.5B Instruct Q6_K** (~380 MB, strong reasoning, best quality)
 - **Fallback**: **SmolLM2 360M Q8_0** (lightweight, for quick drafts or low-memory devices)
 - **Premium**: **Llama 3.2 1B Instruct Q6_K** (optional, for demo "wow factor")
 
-### 🎯 PLANNED AI FEATURES (Vision)
+## 🚨 CRITICAL DEBUGGING INFO (Must Read!)
 
-#### 1. **Atmosphere Architect (Mood DJ)** ✅ 50% DONE
+### Application Class Confusion (FIXED ✅)
 
-**What**: User enters a vibe prompt (e.g., "nostalgic midnight city"), AI generates dynamic
-animation/mood presets in real time  
-**Current**: Prompt field + button exist, JSON parsing ready  
-**Remaining**:
+**Problem**: There are TWO Application classes in the codebase:
 
-- Wire preset application to actually change canvas animation style
-- Sync to backend so web dashboard displays the same mood
-- Add visual preview in editor before applying
+1. `com.cursorgallery.CursorGalleryApp` (created for AI, NOT actually running)
+2. `com.runanywhere.startup_hackathon20.CursorGalleryApp` (the one AndroidManifest points to)
 
-#### 2. **Intelligent Image Sequencing** ✅ 50% DONE
+**Solution**: We added RunAnywhere initialization to the CORRECT Application class at
+`app/src/main/java/com/runanywhere/startup_hackathon20/CursorGalleryApp.kt`:
 
-**What**: AI analyzes uploaded images (color, composition, emotion) and auto-reorders them for
-maximum visual impact in the cursor trail  
-**Current**: Sequence Oracle button exists, applies ordering to gallery  
-**Remaining**:
+```kotlin
+class CursorGalleryApp : Application() {
+    override fun onCreate() {
+        super.onCreate()
+        // Initialize RunAnywhere SDK
+        RunAnywhereManager.initialize(this)
+    }
+}
+```
 
-- Extract lightweight metadata per image (dominant colors, brightness) on-device
-- Feed metadata + thumbnail analysis to model
-- Show before/after comparison UI
-- Allow toggle to revert if user doesn't like AI ordering
-- Sync sequence to backend/web
+**Key Points**:
 
-#### 3. **Personal AI Critic** ✅ 50% DONE
+- MUST use `GlobalScope.launch(Dispatchers.IO)` for SDK initialization (per official docs)
+- Call `LlamaCppServiceProvider.register()` during init
+- Call `scanForDownloadedModels()` to find previously downloaded models
+- Check `RunAnywhereManager.state` to verify initialization completed
 
-**What**: Offline critique mode—LLM reviews portfolio, scores composition/emotion, suggests which
-images to feature  
-**Current**: Critique button exists, displays score cards  
-**Remaining**:
+### SDK Initialization Checklist
 
-- Enhance prompts to provide more insightful feedback
-- Store critique results to Supabase so web dashboard can display AI tips
-- Add toggle for creators to show/hide AI recommendations publicly
-- Cache critiques locally for offline review
+✅ **What Works Now**:
 
-#### 4. **Creator Workflow Automations** ❌ NOT STARTED
+- SDK initializes successfully on app startup
+- AI Studio shows "SDK Status: Ready" with green checkmark
+- 3 models appear in the list (Qwen, SmolLM2, Llama)
+- Download buttons work, show progress
+- Models download successfully (~380MB for Qwen)
+- Load Model button works, model loads into memory
+- Card turns green when model loaded
 
-**What**: Quick actions that run entirely on-device:
+### Model Inference Issue (CURRENT BLOCKER ❌)
 
-- "Write gallery description"
-- "Generate social post copy"
-- "Draft email pitch"
-  **Why**: Concrete productivity angle for hackathon judges  
-  **How**: Add buttons in Create/Share flows, use simple text generation prompts, cache outputs
-  locally
+**Problem**: Model loads successfully but `RunAnywhere.generateStream()` returns 0 tokens.
 
-#### 5. **Contextual AI Chat for Viewers** ❌ NOT STARTED
+**Symptoms**:
 
-**What**: In the share view, visitors can ask AI about the artist's story or specific pieces  
-**Why**: Interactive experience, privacy-first (on-device), can cache responses per artwork  
-**How**:
+```
+D AiOrchestrator: Calling RunAnywhere.generateStream with prompt length: XXX
+D AiOrchestrator: Received full response length: 0
+D AiOrchestrator: Raw response: 
+W System.err: Sanitized JSON: 
+E AiOrchestrator: JSON parsing returned null. Raw response:
+```
 
-- Add chat interface in GalleryViewerScreen
-- Feed gallery metadata + selected image context to model
-- Store interesting Q&As to Supabase for public gallery page
-- Show "AI Curator" badge
+**What We Tried**:
 
-#### 6. **Offline Performance Mode** ✅ IMPLICIT
+1. ✅ Fixed Application class (was the main issue)
+2. ✅ Changed from `CoroutineScope` to `GlobalScope` (per docs)
+3. ✅ Used `generateStream()` with `.fold()` (matching ChatViewModel example)
+4. ✅ Simplified prompts (removed Qwen chat template)
+5. ❌ Still generates 0 tokens
 
-**What**: Spotlight that all AI features work without connectivity (RunAnywhere privacy story)  
-**Current**: SDK is on-device by default  
-**Enhancement**: Add visual indicator ("Offline AI Ready" badge), demo flow for judges
+**Current Code Structure**:
+
+```kotlin
+// AiOrchestrator.kt
+suspend fun executeJsonRequest(prompt: String, parse: (String) -> T): Result<T> {
+    var fullResponse = ""
+    RunAnywhere.generateStream(prompt).fold(fullResponse) { acc, token ->
+        acc + token
+    }
+    // fullResponse.length == 0 (ISSUE!)
+}
+```
+
+**Logs Show**:
+
+- Model loads: `Model -1841487817 loaded successfully into LLM service`
+- But generation produces no tokens
+- No crash, no error - just empty output
+
+**Possible Causes** (for next agent to investigate):
+
+1. Generation parameters missing (max_tokens, temperature) - SDK doesn't expose these in current API
+2. Prompt format issue - model might need special tokens/format
+3. Model file corruption - might need re-download
+4. SDK bug - inference engine not connecting properly
+5. EOS token fired immediately - model thinks prompt is complete
+
+**Important Files**:
+
+- `app/src/main/java/com/cursorgallery/ai/AiOrchestrator.kt` (generation logic)
+- `app/src/main/java/com/cursorgallery/ai/AiBlueprintDocumentation.kt` (prompts)
+- `app/src/main/java/com/cursorgallery/ai/RunAnywhereManager.kt` (SDK wrapper)
+- `app/src/main/java/com/runanywhere/startup_hackathon20/ChatViewModel.kt` (working example from
+  SDK)
+
+**Working Example in Codebase**: `ChatViewModel.kt` uses the EXACT same API (
+`RunAnywhere.generateStream(text).collect { token -> ... }`), so the SDK CAN work - we're missing
+something.
+
+## Next Steps (Priority Order for Next Agent)
+
+### 🔥 URGENT: Fix Model Inference (2-3 hours)
+
+**The blocker**: Model loads but generates 0 tokens. THIS MUST BE FIXED FIRST.
+
+**Debug Strategy**:
+
+1. **Compare with working example**:
+    - Look at `app/src/main/java/com/runanywhere/startup_hackathon20/ChatViewModel.kt`
+    - It uses identical API and works in the original hackathon starter
+    - What's different? (initialization order? model selection? prompt format?)
+
+2. **Test with ChatViewModel directly**:
+    - Try using the existing ChatViewModel in AI Studio
+    - If IT generates text, then our prompt/orchestrator has issues
+    - If it ALSO generates 0 tokens, then SDK/model is the problem
+
+3. **Check SDK logs in detail**:
+   ```powershell
+   adb logcat -d | Select-String "RunAnywhere|LlamaCpp|Generation"
+   ```
+    - Look for generation parameters being set
+    - Check if model is actually in "ready" state
+    - Verify no silent errors
+
+4. **Try different model**:
+    - Download SmolLM2 360M instead
+    - Load it and test generation
+    - If it works → Qwen model issue
+    - If it fails too → broader SDK problem
+
+5. **Test ultra-simple prompt**:
+   ```kotlin
+   RunAnywhere.generateStream("Hello").collect { token ->
+       Log.d("TEST", "Token: $token")
+   }
+   ```
+    - If this generates nothing, SDK is broken
+    - If this works, our prompts are the issue
+
+6. **Check generation configuration** (if SDK exposes it):
+    - Look for `GenerationConfig` or similar classes
+    - Try setting `maxTokens = 100`, `temperature = 0.7`
+    - SDK documentation mentions these parameters exist
+
+7. **Contact RunAnywhere support** (if stuck after 2 hours):
+    - This is a hackathon - they WANT you to succeed
+    - Share logs, model ID, initialization code
+    - Ask if there's a known issue with Qwen 2.5 0.5B
+
+**Success Criteria**: `RunAnywhere.generateStream()` returns at least 1 token for ANY prompt.
+
+### Phase 1: Get Models Working (after fixing inference)
+
+1. **Test model download flow**: Load Qwen 2.5 0.5B in AI Studio, verify no crashes
+2. **Wire actual inference**: Make "Compose Atmosphere" button call real model, parse response
+3. **Debug prompts**: Ensure JSON outputs match expected structure
+4. **Apply presets**: Hook mood presets to actual canvas config changes
+
+### Phase 2: Complete Core Features (4-5 hours)
+
+5. **Image metadata extraction**: For sequencing, analyze colors/brightness per image
+6. **Sequence validation**: Test oracle with real portfolios, refine rationale prompts
+7. **Critique enhancement**: Improve scoring logic, add more insightful recommendations
+8. **Workflow automations**: Add "Write description" button in CreatePortfolioScreen
+
+### Phase 3: Backend Sync (2-3 hours)
+
+9. **API endpoints**: POST AI results to Flask (`/api/galleries/{id}/ai-insights`)
+10. **Supabase schema**: Add `ai_insights` JSONB column to galleries table
+11. **Web display**: Show critique/mood/sequence on gallery detail page
+
+### Phase 4: Polish & Demo (2-3 hours)
+
+12. **UI animations**: Smooth transitions, loading states, success feedback
+13. **Error handling**: Graceful degradation if model fails
+14. **Demo portfolio**: Create a showcase portfolio with before/after examples
+15. **Walkthrough script**: Document the demo flow for judges
 
 ## Technical Architecture
 
@@ -469,24 +588,27 @@ Return JSON:
 ## Winning Pitch (For Judges)
 
 > "Vibestate brings AI creativity tools directly to your fingertips—no cloud, no privacy concerns,
-completely offline. Our Palette Architect turns vibe prompts into dynamic gallery atmospheres in
-seconds. The Sequence Oracle analyzes your images and reorders them for maximum emotional impact,
-turning a random collection into a curated visual journey. And our AI Critic provides instant,
-constructive feedback on composition, emotion, and storytelling—all without sending a single pixel
-to the cloud. This is what privacy-first creative AI looks like."
+> completely offline. Our Palette Architect turns vibe prompts into dynamic gallery atmospheres in
+> seconds. The Sequence Oracle analyzes your images and reorders them for maximum emotional impact,
+> turning a random collection into a curated visual journey. And our AI Critic provides instant,
+> constructive feedback on composition, emotion, and storytelling—all without sending a single pixel
+> to the cloud. This is what privacy-first creative AI looks like."
 
 ---
 
 ## For Next Agent: What You Need to Do
 
+**CRITICAL FIRST STEP**: Fix the model inference issue. The model loads successfully but
+`RunAnywhere.generateStream()` returns 0 tokens. THIS MUST BE FIXED FIRST.
+
 **Read this document fully.** Then:
 
-1. **Start with model loading**: Get Qwen 2.5 0.5B downloaded and loaded in AI Studio screen. Test
-   by tapping "Compose Atmosphere" in gallery editor with a simple prompt. Confirm you get a real
-   response (even if it's not perfect).
+1. **FIX MODEL GENERATION**: Get ANYTHING to generate. Even "Hello World". This is mandatory.
 
-2. **Fix prompts**: The current prompts in `AiOrchestrator.kt` are placeholders. Replace them with
-   the templates above and tune until JSON parses correctly.
+2. **Once generation works**:
+    - Test with mood preset prompts
+    - Parse JSON responses
+    - Apply to gallery
 
 3. **Wire outputs**: Make sure mood presets actually change the gallery animation type, sequence
    oracle actually reorders images, and critique scores persist.
@@ -499,12 +621,18 @@ to the cloud. This is what privacy-first creative AI looks like."
 
 **Do NOT**:
 
-- Create unnecessary documentation files
+- Create unnecessary documentation files (no AI_TESTING_GUIDE.md, no PHASE_1_SUMMARY.md, etc.)
 - Modify files without understanding existing architecture
 - Break existing functionality (test after every change)
 - Make Git commits without user permission
 - Waste time on over-engineering—ship features that work
+- Give up on fixing the generation issue - this is the core of the hackathon
 
 **Remember**: The goal is to **WIN the hackathon**. That means creative, polished, demo-ready AI
 features that judges can see and understand in 5 minutes. Focus on impact over complexity. Make the
-Palette Architect, Sequence Oracle, and AI Critic shine. Good luck! 🚀
+Palette Architect, Sequence Oracle, and AI Critic shine.
+
+**The RunAnywhere SDK MUST work** - this is what the hackathon is about. Don't settle for mocking
+it. Fix the generation issue first, then build on top of working inference.
+
+Good luck! 
