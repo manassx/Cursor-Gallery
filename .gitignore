@@ -5,6 +5,10 @@
 .env.*.local
 *.env
 
+# Summary/documentation files (local only)
+COMMIT_SUMMARY.md
+FIXES_APPLIED.md
+
 # Python
 __pycache__/
 *.py[cod]
