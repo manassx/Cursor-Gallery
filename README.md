@@ -27,7 +27,7 @@ Current solutions fall into two camps:
 
 ## 💡 **Our Solution: Interactive, Privacy-First Portfolios**
 
-**Vibestate** transforms the portfolio experience from static galleries into **dynamic, cursor-driven journeys** that
+**CursorGallery** transforms the portfolio experience from static galleries into **dynamic, cursor-driven journeys** that
 respond to how viewers explore your work. Combined with **on-device AI** that never sends your creative assets to the
 cloud, we've built something genuinely different.
 
@@ -46,7 +46,7 @@ you choose your own path.
 
 ### **The Privacy Breakthrough: On-Device AI**
 
-While competitors upload your images to cloud AI services (exposing your IP and creative work), **Vibestate brings AI
+While competitors upload your images to cloud AI services (exposing your IP and creative work), **CursorGallery brings AI
 directly to your device**:
 
 - **Portfolio Sequencing**: AI analyzes visual flow, color harmony, and emotional progression to suggest optimal image
@@ -61,7 +61,7 @@ directly to your device**:
 
 ## 🏗️ **Architecture: Cross-Platform Creative Ecosystem**
 
-Vibestate is a **full-stack creative platform** spanning web and mobile, unified by a shared design language and data
+CursorGallery is a **full-stack creative platform** spanning web and mobile, unified by a shared design language and data
 sync.
 
 ### **1. Web Platform** (React + Vite)
