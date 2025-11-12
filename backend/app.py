@@ -7,7 +7,13 @@ from supabase import create_client, Client
 from dotenv import load_dotenv
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
-from PIL import Image
+try:
+    from PIL import Image  # Optional: may fail on serverless without native libs
+    PIL_AVAILABLE = True
+except Exception as _pil_err:
+    Image = None  # type: ignore
+    PIL_AVAILABLE = False
+    print(f"[WARN] Pillow import failed or unavailable: {_pil_err}")
 import io
 import hashlib
 
@@ -135,20 +141,25 @@ def allowed_file(filename):
 
 
 def create_thumbnail(image_data):
-    """Create a thumbnail from image data"""
+    """Create a thumbnail from image data. Safe if Pillow is unavailable."""
+    if not PIL_AVAILABLE:
+        return None
     try:
         img = Image.open(io.BytesIO(image_data))
-        img.thumbnail(THUMBNAIL_SIZE, Image.Resampling.LANCZOS)
-        
-        # Convert to RGB if necessary (for PNG with transparency)
+        # Pillow 10: use Image.Resampling if available
+        try:
+            resample = Image.Resampling.LANCZOS
+        except Exception:
+            resample = Image.LANCZOS
+        img.thumbnail(THUMBNAIL_SIZE, resample)
+
         if img.mode in ('RGBA', 'LA', 'P'):
             background = Image.new('RGB', img.size, (255, 255, 255))
             if img.mode == 'P':
                 img = img.convert('RGBA')
             background.paste(img, mask=img.split()[-1] if img.mode == 'RGBA' else None)
             img = background
-        
-        # Save to bytes
+
         thumb_io = io.BytesIO()
         img.save(thumb_io, format='JPEG', quality=85)
         thumb_io.seek(0)
@@ -1284,14 +1295,18 @@ def upload_images(gallery_id):
                         )
                         thumbnail_url = supabase.storage.from_(STORAGE_BUCKET).get_public_url(thumbnail_filename)
                     
-                    # Get image metadata
-                    img = Image.open(io.BytesIO(file_data))
-                    metadata = {
-                        "width": img.width,
-                        "height": img.height,
-                        "size": len(file_data),
-                        "format": img.format
-                    }
+                    # Get image metadata (safe if Pillow unavailable)
+                    metadata = {"size": len(file_data)}
+                    if PIL_AVAILABLE:
+                        try:
+                            img = Image.open(io.BytesIO(file_data))
+                            metadata.update({
+                                "width": img.width,
+                                "height": img.height,
+                                "format": img.format
+                            })
+                        except Exception as meta_err:
+                            print(f"Pillow metadata read failed: {meta_err}")
                     
                     # Save image record to database
                     image_data = {
