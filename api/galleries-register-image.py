@@ -1,13 +1,8 @@
 import os
-import sys
 import json
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from supabase import create_client
-
-# Add backend directory to path
-backend_path = os.path.join(os.path.dirname(__file__), '..', 'backend')
-sys.path.insert(0, backend_path)
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
@@ -21,22 +16,19 @@ if not SUPABASE_URL or not SUPABASE_KEY:
 
 supabase = create_client(SUPABASE_URL, SUPABASE_KEY) if SUPABASE_URL and SUPABASE_KEY else None
 
-# Import utility functions from backend
-try:
-    from app import get_user_from_token
-except ImportError:
-    def get_user_from_token():
-        """Fallback if import fails"""
-        auth_header = request.headers.get('Authorization')
-        if not auth_header or not auth_header.startswith('Bearer '):
-            return None
-        
-        token = auth_header.replace('Bearer ', '')
-        try:
-            user = supabase.auth.get_user(token)
-            return user.user if user else None
-        except:
-            return None
+def get_user_from_token():
+    """Get user from Bearer token"""
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or not auth_header.startswith('Bearer '):
+        return None
+    
+    token = auth_header.replace('Bearer ', '')
+    try:
+        user = supabase.auth.get_user(token)
+        return user.user if user else None
+    except Exception as e:
+        print(f"[AUTH] Error getting user: {e}")
+        return None
 
 @app.route('/', methods=['POST'])
 @app.route('/<path:path>', methods=['POST'])
@@ -47,29 +39,41 @@ def handler(path=None):
     Bypasses Vercel's 4.5MB limit since payload is tiny (< 1KB).
     """
     try:
+        print(f"[DEBUG] Register image request received")
+        
         if not supabase:
+            print("[ERROR] Supabase not configured")
             return jsonify({"error": "Supabase not configured"}), 500
 
         user = get_user_from_token()
         if not user:
+            print("[ERROR] Unauthorized - no valid user")
             return jsonify({"error": "Unauthorized"}), 401
+        
+        print(f"[DEBUG] User authenticated: {user.id}")
         
         # Extract gallery ID from query parameters (Vercel routing)
         gallery_id = request.args.get('gallery_id')
         if not gallery_id:
+            print("[ERROR] Missing gallery_id parameter")
             return jsonify({"error": "Gallery ID required"}), 400
+        
+        print(f"[DEBUG] Gallery ID: {gallery_id}")
         
         # Verify gallery ownership
         gallery_result = supabase.table('galleries').select('*').eq('id', gallery_id).eq('user_id', user.id).execute()
         
         if not gallery_result.data:
+            print(f"[ERROR] Gallery not found: {gallery_id}")
             return jsonify({"error": "Gallery not found"}), 404
         
         gallery = gallery_result.data[0]
+        print(f"[DEBUG] Gallery found: {gallery['name']}")
         
         # Get metadata from request (tiny JSON payload)
         data = request.get_json()
         if not data:
+            print("[ERROR] Missing JSON data")
             return jsonify({"error": "Missing JSON data"}), 400
         
         url = data.get('url')
@@ -112,6 +116,7 @@ def handler(path=None):
         image_result = supabase.table('images').insert(image_data).execute()
         
         if not image_result.data:
+            print("[ERROR] Failed to save image record")
             return jsonify({"error": "Failed to save image record"}), 500
         
         # Update gallery image count

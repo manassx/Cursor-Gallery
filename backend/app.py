@@ -1308,6 +1308,92 @@ def delete_gallery(gallery_id):
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/api/galleries/<gallery_id>/register-image", methods=["POST"])
+def register_uploaded_image(gallery_id):
+    """
+    Register an image that was uploaded directly to Supabase Storage.
+    This endpoint only receives metadata (URLs, dimensions), not the actual file.
+    Bypasses Vercel's 4.5MB limit since payload is tiny (< 1KB).
+    """
+    user = get_user_from_token()
+    if not user:
+        return jsonify({"error": "Unauthorized"}), 401
+    
+    try:
+        # Verify gallery ownership
+        gallery_result = supabase.table('galleries').select('*').eq('id', gallery_id).eq('user_id', user.id).execute()
+        
+        if not gallery_result.data:
+            return jsonify({"error": "Gallery not found"}), 404
+        
+        gallery = gallery_result.data[0]
+        
+        # Get metadata from request (tiny JSON payload)
+        data = request.get_json()
+        if not data:
+            return jsonify({"error": "Missing JSON data"}), 400
+        
+        url = data.get('url')
+        storage_key = data.get('storageKey')
+        file_name = data.get('fileName')
+        file_size = data.get('size')
+        width = data.get('width')
+        height = data.get('height')
+        
+        if not url or not storage_key:
+            return jsonify({"error": "Missing required fields (url, storageKey)"}), 400
+        
+        print(f"📝 [Register Image] Gallery: {gallery_id}, File: {file_name}, Size: {file_size} bytes")
+        
+        # Use same URL for thumbnail (Supabase can do transforms later)
+        thumbnail_url = url
+        
+        # Get current max order index
+        max_order_result = supabase.table('images').select('order_index').eq('gallery_id', gallery_id).order('order_index', desc=True).limit(1).execute()
+        current_max_order = max_order_result.data[0]['order_index'] if max_order_result.data else -1
+        
+        # Prepare metadata
+        metadata = {
+            "width": width,
+            "height": height,
+            "size": file_size,
+            "format": file_name.rsplit('.', 1)[1].lower() if '.' in file_name else 'unknown',
+            "storage_key": storage_key
+        }
+        
+        # Save image record to database
+        image_data = {
+            "gallery_id": gallery_id,
+            "url": url,
+            "thumbnail_url": thumbnail_url,
+            "metadata": metadata,
+            "order_index": current_max_order + 1
+        }
+        
+        image_result = supabase.table('images').insert(image_data).execute()
+        
+        if not image_result.data:
+            return jsonify({"error": "Failed to save image record"}), 500
+        
+        # Update gallery image count
+        new_count = gallery['image_count'] + 1
+        supabase.table('galleries').update({
+            "image_count": new_count,
+            "status": "processing" if new_count > 0 else gallery['status']
+        }).eq('id', gallery_id).execute()
+        
+        print(f"✅ [Register Image] Success! Total images in gallery: {new_count}")
+        
+        return jsonify({
+            "success": True,
+            "image": image_result.data[0]
+        }), 200
+    
+    except Exception as e:
+        print(f"❌ [Register Image] Error: {e}")
+        return jsonify({"error": str(e)}), 500
+
+
 @app.route("/api/galleries/<gallery_id>/upload", methods=["POST"])
 def upload_images(gallery_id):
     """Upload images to a gallery"""
